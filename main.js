@@ -719,6 +719,57 @@ for (let i = 0; i < 40; i++) {
   scene.add(boulder);
 }
 
+// ─── Particles ────────────────────────────────────────────────────────────────
+const DUST_N = 200, SPORE_N = 180;
+
+// Per-particle base positions and phase offsets (kept for animation)
+const dustBase  = new Float32Array(DUST_N  * 3);
+const dustPhase = new Float32Array(DUST_N);
+const dustPos   = new Float32Array(DUST_N  * 3);
+
+for (let i = 0; i < DUST_N; i++) {
+  // Random position inside the hollow keep interior
+  const x = keepX - keepW*0.5 + wt + rng() * (keepW - wt*2);
+  const y = BY + 0.6 + rng() * (keepH * 0.85);
+  const z = keepZ - keepD*0.5 + wt + rng() * (keepD - wt*2);
+  dustBase[i*3]=x; dustBase[i*3+1]=y; dustBase[i*3+2]=z;
+  dustPos [i*3]=x; dustPos [i*3+1]=y; dustPos [i*3+2]=z;
+  dustPhase[i] = rng() * Math.PI * 2;
+}
+const dustGeo = new THREE.BufferGeometry();
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+const dustPoints = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+  size: 0.07, color: 0xffe8a0, transparent: true, opacity: 0.52,
+  depthWrite: false, sizeAttenuation: true,
+}));
+scene.add(dustPoints);
+
+// Forest spores — spread through woodland outside the clearing
+const sporeBase  = new Float32Array(SPORE_N * 3);
+const sporePhase = new Float32Array(SPORE_N);
+const sporePos   = new Float32Array(SPORE_N * 3);
+let si = 0;
+while (si < SPORE_N) {
+  const angle = rng() * Math.PI * 2;
+  const r     = 30 + rng() * 360;
+  const sx    = CX + Math.cos(angle) * r;
+  const sz    = CZ_C + Math.sin(angle) * r;
+  if (Math.abs(sx) > WORLD*0.46 || Math.abs(sz) > WORLD*0.46) continue;
+  if (Math.hypot(sx - CX, sz - CZ_C) < CLR_OUT + 20) continue;  // stay in forest
+  const sy = getH(sx, sz) + 0.5 + rng() * 5;
+  sporeBase[si*3]=sx; sporeBase[si*3+1]=sy; sporeBase[si*3+2]=sz;
+  sporePos [si*3]=sx; sporePos [si*3+1]=sy; sporePos [si*3+2]=sz;
+  sporePhase[si] = rng() * Math.PI * 2;
+  si++;
+}
+const sporeGeo = new THREE.BufferGeometry();
+sporeGeo.setAttribute('position', new THREE.BufferAttribute(sporePos, 3));
+const sporePoints = new THREE.Points(sporeGeo, new THREE.PointsMaterial({
+  size: 0.15, color: 0xc8f0a0, transparent: true, opacity: 0.38,
+  depthWrite: false, sizeAttenuation: true,
+}));
+scene.add(sporePoints);
+
 setProgress(100);
 
 // ─── Resize ───────────────────────────────────────────────────────────────────
@@ -825,6 +876,31 @@ function animate() {
   // Animate water
   pondMat.color.setHSL(0.575, 0.55, 0.20 + Math.sin(elapsed * 0.9) * 0.022);
   pondMat.roughness = 0.04 + Math.sin(elapsed * 1.4) * 0.025;
+
+  // Animate dust motes — slow brownian drift within the keep interior
+  const dustAttr = dustGeo.attributes.position;
+  for (let i = 0; i < DUST_N; i++) {
+    const ph = dustPhase[i];
+    dustAttr.setXYZ(i,
+      dustBase[i*3]   + Math.sin(elapsed*0.28 + ph)        * 0.20,
+      dustBase[i*3+1] + Math.sin(elapsed*0.20 + ph*1.30)   * 0.14,
+      dustBase[i*3+2] + Math.cos(elapsed*0.24 + ph*0.85)   * 0.20
+    );
+  }
+  dustAttr.needsUpdate = true;
+
+  // Animate forest spores — gentle multi-frequency float and drift
+  const sporeAttr = sporeGeo.attributes.position;
+  for (let i = 0; i < SPORE_N; i++) {
+    const ph = sporePhase[i];
+    sporeAttr.setXYZ(i,
+      sporeBase[i*3]   + Math.sin(elapsed*0.12 + ph)        * 1.5,
+      sporeBase[i*3+1] + Math.sin(elapsed*0.09 + ph*1.20)   * 1.1
+                       + Math.sin(elapsed*0.04 + ph*0.38)   * 2.6,
+      sporeBase[i*3+2] + Math.cos(elapsed*0.11 + ph*0.95)   * 1.5
+    );
+  }
+  sporeAttr.needsUpdate = true;
 
   renderer.render(scene, camera);
 }
