@@ -36,13 +36,13 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.60;
+renderer.toneMappingExposure = 0.72;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
 // ─── Scene & Camera ───────────────────────────────────────────────────────────
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x8aaabf, 0.0016);
+scene.fog = new THREE.FogExp2(0xb8a070, 0.0013);
 
 const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 3000);
 camera.rotation.order = 'YXZ';
@@ -134,42 +134,46 @@ if (isMobile) {
   }, { passive: false });
 }
 
-// ─── Sky ──────────────────────────────────────────────────────────────────────
+// ─── Sky — golden hour / misty morning ───────────────────────────────────────
 const sky = new Sky();
 sky.scale.setScalar(20000);
 scene.add(sky);
 const skyU = sky.material.uniforms;
-skyU.turbidity.value       = 5.5;
-skyU.rayleigh.value        = 2.2;
-skyU.mieCoefficient.value  = 0.007;
-skyU.mieDirectionalG.value = 0.84;
+skyU.turbidity.value       = 10.0;   // thick atmospheric haze
+skyU.rayleigh.value        = 3.5;    // heavy scattering → warm orange horizon
+skyU.mieCoefficient.value  = 0.012;  // fine particle haze
+skyU.mieDirectionalG.value = 0.90;   // tight forward glow around sun disc
 const sunDir = new THREE.Vector3();
-sunDir.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 40), THREE.MathUtils.degToRad(195));
+// Sun low in the southeast — elevation 20°, produces long dramatic castle shadows
+sunDir.setFromSphericalCoords(1, THREE.MathUtils.degToRad(70), THREE.MathUtils.degToRad(160));
 skyU.sunPosition.value.copy(sunDir);
 
 setProgress(10);
 
-// ─── Lighting ─────────────────────────────────────────────────────────────────
-const hemi = new THREE.HemisphereLight(0xb8d4f0, 0x3a5820, 1.6);
+// ─── Lighting — golden hour palette ──────────────────────────────────────────
+// Warm amber sky dome, dark moss ground bounce
+const hemi = new THREE.HemisphereLight(0xffc870, 0x2a3010, 1.9);
 scene.add(hemi);
 
-const ambLight = new THREE.AmbientLight(0x2a3a4a, 0.4);
+// Subtle warm fill for shadow regions
+const ambLight = new THREE.AmbientLight(0x3c2418, 0.55);
 scene.add(ambLight);
 
-const sunLight = new THREE.DirectionalLight(0xffe0b0, 3.8);
+// Primary sun — deep orange-gold, low angle for long shadow drama
+const sunLight = new THREE.DirectionalLight(0xff8c30, 5.0);
 sunLight.position.copy(sunDir).multiplyScalar(900);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.set(4096, 4096);
 sunLight.shadow.camera.near   = 1;
-sunLight.shadow.camera.far    = 2200;
-sunLight.shadow.camera.left   = sunLight.shadow.camera.bottom = -650;
-sunLight.shadow.camera.right  = sunLight.shadow.camera.top   =  650;
-sunLight.shadow.bias          = -0.0003;
+sunLight.shadow.camera.far    = 2500;
+sunLight.shadow.camera.left   = sunLight.shadow.camera.bottom = -700;
+sunLight.shadow.camera.right  = sunLight.shadow.camera.top   =  700;
+sunLight.shadow.bias          = -0.0004;
 scene.add(sunLight);
 
-// Atmospheric fill — cool blue light from opposite of sun
-const fillLight = new THREE.DirectionalLight(0x6080a0, 0.4);
-fillLight.position.set(-sunDir.x, sunDir.y * 0.5, -sunDir.z);
+// Cool blue sky-bounce from the shadow hemisphere (northwest of sun)
+const fillLight = new THREE.DirectionalLight(0x3060c0, 0.65);
+fillLight.position.set(-sunDir.x, Math.abs(sunDir.y) * 0.6, -sunDir.z);
 scene.add(fillLight);
 
 setProgress(15);
