@@ -518,29 +518,49 @@ box(CX, BY + wallH + 3.5, CZ_C + wallD*0.5, gateW, 7, wallT, stoneMat);
   scene.add(gd);
 });
 
-// Main keep — back-center of castle
-const keepW = 58, keepD = 46, keepH = 40;
-const keepX = CX, keepZ = CZ_C - wallD*0.5 + 20 + keepD*0.5;
-box(keepX, BY + keepH*0.5, keepZ, keepW, keepH, keepD, stoneMat);
-// Keep arrow-slit windows on all 4 faces
-for (let floor = 0; floor < 4; floor++) {
-  const wy = BY + 7 + floor * 8.5;
-  [-18, -7, 7, 18].forEach(wx => {
-    box(keepX + wx, wy, keepZ + keepD*0.5 + 0.01, 1.8, 3.2, 0.5, darkStoneMat);
-    box(keepX + wx, wy, keepZ - keepD*0.5 - 0.01, 1.8, 3.2, 0.5, darkStoneMat);
+// ─── Hollow Keep — four wall segments leave a walkable interior ──────────────
+const keepW = 56, keepD = 44, keepH = 44, wt = 5;
+const keepDoorW = 10, keepDoorH = 12;
+const keepX = CX, keepZ = CZ_C - wallD*0.5 + 18 + keepD*0.5;
+
+// Perimeter walls — south wall split around the entrance doorway
+box(keepX, BY + keepH*0.5, keepZ - keepD*0.5 + wt*0.5,
+    keepW, keepH, wt, stoneMat);                                              // north wall
+box(keepX + keepW*0.5 - wt*0.5, BY + keepH*0.5, keepZ,
+    wt, keepH, keepD, stoneMat);                                              // east wall
+box(keepX - keepW*0.5 + wt*0.5, BY + keepH*0.5, keepZ,
+    wt, keepH, keepD, stoneMat);                                              // west wall
+const sSegW = keepW*0.5 - keepDoorW*0.5;
+box(keepX - keepDoorW*0.5 - sSegW*0.5, BY + keepH*0.5,
+    keepZ + keepD*0.5 - wt*0.5, sSegW, keepH, wt, stoneMat);               // south-left
+box(keepX + keepDoorW*0.5 + sSegW*0.5, BY + keepH*0.5,
+    keepZ + keepD*0.5 - wt*0.5, sSegW, keepH, wt, stoneMat);               // south-right
+box(keepX, BY + keepDoorH + (keepH - keepDoorH)*0.5,
+    keepZ + keepD*0.5 - wt*0.5,
+    keepDoorW, keepH - keepDoorH, wt, stoneMat);                             // arch header
+
+// Interior stone floor slab
+box(keepX, BY + 0.2, keepZ, keepW - wt*2, 0.4, keepD - wt*2, darkStoneMat);
+
+// Arrow-slit markers on outer faces (4 floors)
+for (let f = 0; f < 4; f++) {
+  const wy = BY + 8 + f * 9;
+  [-15, -5, 5, 15].forEach(wx => {
+    box(keepX + wx, wy, keepZ - keepD*0.5 - 0.1, 1.6, 3.0, 0.5, darkStoneMat);
   });
-  [-12, 0, 12].forEach(wz => {
-    box(keepX + keepW*0.5 + 0.01, wy, keepZ + wz, 0.5, 3.2, 1.8, darkStoneMat);
-    box(keepX - keepW*0.5 - 0.01, wy, keepZ + wz, 0.5, 3.2, 1.8, darkStoneMat);
+  [-10, 0, 10].forEach(wz => {
+    box(keepX + keepW*0.5 + 0.1, wy, keepZ + wz, 0.5, 3.0, 1.6, darkStoneMat);
+    box(keepX - keepW*0.5 - 0.1, wy, keepZ + wz, 0.5, 3.0, 1.6, darkStoneMat);
   });
 }
-// Keep battlements on all 4 sides
-battlements(keepX, BY + keepH, keepZ - keepD*0.5, keepW, wallT, 'x', darkStoneMat);
-battlements(keepX, BY + keepH, keepZ + keepD*0.5, keepW, wallT, 'x', darkStoneMat);
-battlements(keepX - keepW*0.5, BY + keepH, keepZ, keepD, wallT, 'z', darkStoneMat);
-battlements(keepX + keepW*0.5, BY + keepH, keepZ, keepD, wallT, 'z', darkStoneMat);
 
-// Keep corner turrets
+// Battlements on all four wall tops
+battlements(keepX, BY + keepH, keepZ - keepD*0.5, keepW, wt, 'x', darkStoneMat);
+battlements(keepX, BY + keepH, keepZ + keepD*0.5, keepW, wt, 'x', darkStoneMat);
+battlements(keepX - keepW*0.5, BY + keepH, keepZ, keepD, wt, 'z', darkStoneMat);
+battlements(keepX + keepW*0.5, BY + keepH, keepZ, keepD, wt, 'z', darkStoneMat);
+
+// Corner turrets
 const ktR = 6.5, ktH = keepH + 13;
 [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([tx, tz]) => {
   const tcx = keepX + tx*keepW*0.5, tcz = keepZ + tz*keepD*0.5;
@@ -548,6 +568,24 @@ const ktR = 6.5, ktH = keepH + 13;
   cyl(tcx, BY + ktH + 1.6, tcz, ktR + 0.5, ktR + 0.5, 3.2, 10, stoneMat);
   cone(tcx, BY + ktH + 3.2 + 8, tcz, ktR + 1.2, 16, 10, roofMat);
 });
+
+// ─── Interior Staircase — rises along east interior wall heading north ────────
+// 28 steps carry the player from ground (BY) to the battlement deck (BY+keepH)
+const stairCount = 28;
+const stairStepH = keepH / stairCount;                          // height per step
+const stairStepD = (keepD - wt * 2) / stairCount;              // depth per step
+const stairW     = 5.5;
+const stairX     = keepX + keepW * 0.5 - wt - stairW * 0.5;   // flush with east interior face
+const stairZS    = keepZ + keepD * 0.5 - wt - stairStepD * 0.5; // southernmost step
+const stairZN    = stairZS - (stairCount - 1) * stairStepD;     // northernmost step
+
+for (let s = 0; s < stairCount; s++) {
+  box(stairX,
+      BY + stairStepH * (s + 0.5),
+      stairZS - s * stairStepD,
+      stairW, stairStepH, stairStepD,
+      darkStoneMat);
+}
 
 // Inner great hall (attached to keep south face)
 const hallW = 40, hallD = 28, hallH = 20;
@@ -602,12 +640,42 @@ let elapsed    = 0;
 let bobPhase   = 0;
 let smoothY    = 2.5;
 
+// Returns the walkable floor height at world position (px, pz).
+// Checks the staircase ramp first, then keep wall-walks, then terrain.
+function getFloorH(px, pz) {
+  // Staircase: smooth ramp from ground (BY) to battlement deck (BY+keepH)
+  if (px >= stairX - stairW*0.5 - 0.5 && px <= stairX + stairW*0.5 + 0.5 &&
+      pz <= stairZS + stairStepD      && pz >= stairZN - stairStepD) {
+    const t = Math.max(0, Math.min(1, (stairZS - pz) / (stairZS - stairZN)));
+    return BY + t * keepH;
+  }
+  // Keep wall-walks at battlement level (east, west, north, south segments)
+  const kTop = BY + keepH;
+  if (px >= keepX + keepW*0.5 - wt - 0.3 && px <= keepX + keepW*0.5 + 0.3 &&
+      pz >= keepZ - keepD*0.5 - 0.3   && pz <= keepZ + keepD*0.5 + 0.3) return kTop; // east
+  if (px >= keepX - keepW*0.5 - 0.3   && px <= keepX - keepW*0.5 + wt + 0.3 &&
+      pz >= keepZ - keepD*0.5 - 0.3   && pz <= keepZ + keepD*0.5 + 0.3) return kTop; // west
+  if (px >= keepX - keepW*0.5 - 0.3   && px <= keepX + keepW*0.5 + 0.3 &&
+      pz >= keepZ - keepD*0.5 - 0.3   && pz <= keepZ - keepD*0.5 + wt + 0.3) return kTop; // north
+  if (px >= keepX - keepW*0.5 - 0.3   && px < keepX - keepDoorW*0.5 &&
+      pz >= keepZ + keepD*0.5 - wt - 0.3 && pz <= keepZ + keepD*0.5 + 0.3) return kTop; // south-left
+  if (px >  keepX + keepDoorW*0.5     && px <= keepX + keepW*0.5 + 0.3 &&
+      pz >= keepZ + keepD*0.5 - wt - 0.3 && pz <= keepZ + keepD*0.5 + 0.3) return kTop; // south-right
+  return getH(px, pz);
+}
+
 function moveAndFollow(delta, moving, speed) {
   const p = camera.position;
   p.x = Math.max(-WORLD*0.5 + 4, Math.min(WORLD*0.5 - 4, p.x));
   p.z = Math.max(-WORLD*0.5 + 4, Math.min(WORLD*0.5 - 4, p.z));
-  const targetY = getH(p.x, p.z) + 1.72;
-  smoothY += (targetY - smoothY) * Math.min(1, delta * 14);
+  const targetY = getFloorH(p.x, p.z) + 1.72;
+  // Climbing is instant; falling is capped so stepping off a wall feels physical
+  const dy = targetY - smoothY;
+  if (dy > 0) {
+    smoothY += dy * Math.min(1, delta * 14);
+  } else {
+    smoothY = Math.max(targetY, smoothY - 10 * delta);
+  }
   if (moving) {
     bobPhase += delta * speed * 1.1;
     p.y = smoothY + Math.sin(bobPhase) * 0.055;
