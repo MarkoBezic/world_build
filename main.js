@@ -184,9 +184,9 @@ const SEGS  = 340;
 const NS    = 0.0034;
 const HS    = 62;
 
-// Castle clearing — northeast quadrant
-const CX = 470, CZ_C = -360, CASTLE_BASE_H = 6.5;
-const CLR_IN = 135, CLR_OUT = 230;
+// Castle clearing — due north of spawn so the player walks straight to it
+const CX = 0, CZ_C = -370, CASTLE_BASE_H = 5;
+const CLR_IN = 130, CLR_OUT = 215;
 
 const clearBlend = (x, z) => {
   const d = Math.hypot(x - CX, z - CZ_C);
@@ -270,7 +270,7 @@ setProgress(42);
 
 // ─── Instanced Trees ──────────────────────────────────────────────────────────
 const MAX_PINES = 1200;
-const MAX_OAKS  = 850;
+const MAX_OAKS  = 1060;
 
 const pineTrunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3618, roughness: 0.96 });
 const pineLeafMat0 = new THREE.MeshStandardMaterial({ color: 0x1a4022, roughness: 0.88 });
@@ -302,9 +302,9 @@ for (let attempt = 0; attempt < 26000; attempt++) {
   const z = (rng() - 0.5) * WORLD * 0.94;
   const h = getH(x, z);
 
-  if (x*x + z*z < 25*25) continue;            // keep spawn clear
+  if (x*x + z*z < 25*25) continue;
   if (h < 1.0 || h > 54) continue;
-  if (Math.hypot(x - CX, z - CZ_C) < CLR_OUT * 0.88) continue; // castle clearing
+  if (Math.hypot(x - CX, z - CZ_C) < CLR_IN + 12) continue; // trees grow right to clearing edge
 
   const wantPine = h > 22;
 
@@ -337,6 +337,34 @@ for (let attempt = 0; attempt < 26000; attempt++) {
     oaks++;
   }
 }
+// Dense perimeter ring — oaks placed radially around the clearing to create
+// a dramatic wall of trees the player walks through before the castle reveals
+for (let i = 0; i < 230 && oaks < MAX_OAKS; i++) {
+  const angle = (i / 230) * Math.PI * 2 + rng() * 0.20;
+  const r = CLR_IN + 4 + rng() * 42;
+  const x = CX + Math.cos(angle) * r;
+  const z = CZ_C + Math.sin(angle) * r;
+  if (Math.abs(x) > WORLD * 0.47 || Math.abs(z) > WORLD * 0.47) continue;
+  const h = getH(x, z);
+  if (h < 0.5) continue;
+  const s = 3.4 + rng() * 2.6, th = s * 0.84, ry = rng() * Math.PI * 2;
+  dummy.position.set(x, h+th*0.5, z); dummy.scale.set(s*0.44, th, s*0.44); dummy.rotation.y=ry; dummy.updateMatrix();
+  oakTrunkIM.setMatrixAt(oaks, dummy.matrix);
+  const crA = (1.7 + rng()*0.7)*s;
+  dummy.position.set(x+(rng()-0.5)*s*0.3, h+th+crA*0.55, z+(rng()-0.5)*s*0.3);
+  dummy.scale.set(crA, crA*0.88, crA); dummy.rotation.y=ry; dummy.updateMatrix();
+  oakCapAIM.setMatrixAt(oaks, dummy.matrix);
+  const crB = (1.2 + rng()*0.6)*s;
+  dummy.position.set(x+(rng()-0.5)*s*0.4, h+th+crA*0.72+crB*0.4, z+(rng()-0.5)*s*0.4);
+  dummy.scale.set(crB, crB*0.78, crB); dummy.rotation.y=ry; dummy.updateMatrix();
+  oakCapBIM.setMatrixAt(oaks, dummy.matrix);
+  const crC = (0.8 + rng()*0.5)*s;
+  dummy.position.set(x+(rng()-0.5)*s*0.5, h+th+crA*0.68+crC*0.45, z+(rng()-0.5)*s*0.5);
+  dummy.scale.set(crC, crC*0.72, crC); dummy.rotation.y=ry; dummy.updateMatrix();
+  oakCapCIM.setMatrixAt(oaks, dummy.matrix);
+  oaks++;
+}
+
 pineTrunkIM.count=pines; pineC0IM.count=pines; pineC1IM.count=pines; pineC2IM.count=pines;
 oakTrunkIM.count=oaks; oakCapAIM.count=oaks; oakCapBIM.count=oaks; oakCapCIM.count=oaks;
 allIMs.forEach(m => m.instanceMatrix.needsUpdate = true);
