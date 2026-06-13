@@ -25,6 +25,9 @@ const fbm = (x, y, oct = 6) => {
 let _seed = 0x9e3779b9;
 const rng = () => { _seed = (_seed * 1664525 + 1013904223) >>> 0; return _seed / 0x100000000; };
 
+// ─── Device detection ─────────────────────────────────────────────────────────
+const isMobile = 'ontouchstart' in window && navigator.maxTouchPoints > 0;
+
 // ─── Loading progress ─────────────────────────────────────────────────────────
 const loadingEl  = document.getElementById('loading');
 const loadingBar = document.getElementById('loading-bar');
@@ -46,56 +49,149 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x9bbfd8, 0.005);
 
 const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 2000);
-// Start at edge of clearing, eye height, looking into the forest
+camera.rotation.order = 'YXZ';
 camera.position.set(0, 2.5, 32);
 
-// ─── First-person controls ────────────────────────────────────────────────────
-const controls = new PointerLockControls(camera, document.body);
+// ─── Controls ─────────────────────────────────────────────────────────────────
+const overlay   = document.getElementById('overlay');
+const crosshair = document.getElementById('crosshair');
+const hint      = document.getElementById('hint');
 
-const overlay    = document.getElementById('overlay');
-const crosshair  = document.getElementById('crosshair');
-const hint       = document.getElementById('hint');
+let gameActive  = false;
+let plControls  = null; // PointerLockControls — desktop only
+const keys      = {};
 
-overlay.addEventListener('click', () => controls.lock());
+if (!isMobile) {
+  // ── Desktop ────────────────────────────────────────────────────────────────
+  overlay.innerHTML = `
+    <h1>Forest World</h1>
+    <p>Click to explore</p>
+    <div class="keys">
+      <div class="key" style="grid-column:2">W</div>
+      <div class="key">A</div><div class="key">S</div><div class="key">D</div>
+      <div class="key shift">⇧ Sprint</div>
+      <div class="key wide">Esc — release cursor</div>
+    </div>`;
 
-controls.addEventListener('lock', () => {
-  overlay.classList.add('hidden');
-  crosshair.classList.add('visible');
-  hint.classList.add('visible');
-});
-controls.addEventListener('unlock', () => {
-  overlay.classList.remove('hidden');
-  crosshair.classList.remove('visible');
-  hint.classList.remove('visible');
-});
+  plControls = new PointerLockControls(camera, document.body);
+  overlay.addEventListener('click', () => plControls.lock());
+  plControls.addEventListener('lock', () => {
+    gameActive = true;
+    overlay.classList.add('hidden');
+    crosshair.classList.add('visible');
+    hint.classList.add('visible');
+  });
+  plControls.addEventListener('unlock', () => {
+    gameActive = false;
+    overlay.classList.remove('hidden');
+    crosshair.classList.remove('visible');
+    hint.classList.remove('visible');
+  });
 
-// Keyboard state
-const keys = {};
-window.addEventListener('keydown', e => { keys[e.code] = true; });
-window.addEventListener('keyup',   e => { keys[e.code] = false; });
+  window.addEventListener('keydown', e => { keys[e.code] = true; });
+  window.addEventListener('keyup',   e => { keys[e.code] = false; });
+
+} else {
+  // ── Mobile ─────────────────────────────────────────────────────────────────
+  overlay.innerHTML = `
+    <h1>Forest World</h1>
+    <p>Tap to explore</p>
+    <div class="mobile-hint">
+      <span>Left — move</span>
+      <span>Right — look</span>
+    </div>`;
+
+  overlay.addEventListener('click', () => {
+    overlay.classList.add('hidden');
+    gameActive = true;
+  });
+}
+
+// ─── Mobile touch ─────────────────────────────────────────────────────────────
+const JMAX = 55;
+const joy  = { active: false, id: -1, baseX: 0, baseY: 0, dx: 0, dy: 0 };
+const look = { active: false, id: -1, lastX: 0, lastY: 0 };
+let mYaw   = 0;
+let mPitch = 0;
+
+const jBaseEl = document.getElementById('joystick-base');
+const jKnobEl = document.getElementById('joystick-knob');
+
+function syncJoyUI() {
+  if (joy.active) {
+    jBaseEl.style.display = 'block';
+    jBaseEl.style.left = joy.baseX + 'px';
+    jBaseEl.style.top  = joy.baseY + 'px';
+    jKnobEl.style.transform = `translate(calc(-50% + ${joy.dx}px), calc(-50% + ${joy.dy}px))`;
+  } else {
+    jBaseEl.style.display = 'none';
+  }
+}
+
+if (isMobile) {
+  const cv = renderer.domElement;
+
+  cv.addEventListener('touchstart', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (!joy.active && t.clientX < innerWidth * 0.5) {
+        Object.assign(joy, { active: true, id: t.identifier,
+          baseX: t.clientX, baseY: t.clientY, dx: 0, dy: 0 });
+        syncJoyUI();
+      } else if (!look.active) {
+        Object.assign(look, { active: true, id: t.identifier,
+          lastX: t.clientX, lastY: t.clientY });
+      }
+    }
+  }, { passive: false });
+
+  cv.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (joy.active && t.identifier === joy.id) {
+        joy.dx = Math.max(-JMAX, Math.min(JMAX, t.clientX - joy.baseX));
+        joy.dy = Math.max(-JMAX, Math.min(JMAX, t.clientY - joy.baseY));
+        syncJoyUI();
+      } else if (look.active && t.identifier === look.id) {
+        mYaw   -= (t.clientX - look.lastX) * 0.004;
+        mPitch -= (t.clientY - look.lastY) * 0.004;
+        mPitch  = Math.max(-Math.PI * 0.44, Math.min(Math.PI * 0.44, mPitch));
+        look.lastX = t.clientX;
+        look.lastY = t.clientY;
+      }
+    }
+  }, { passive: false });
+
+  cv.addEventListener('touchend', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (joy.active  && t.identifier === joy.id)  { Object.assign(joy,  { active: false, dx: 0, dy: 0 }); syncJoyUI(); }
+      if (look.active && t.identifier === look.id) { look.active = false; }
+    }
+  }, { passive: false });
+}
 
 // ─── Sky ──────────────────────────────────────────────────────────────────────
 const sky = new Sky();
 sky.scale.setScalar(10000);
 scene.add(sky);
 const skyU = sky.material.uniforms;
-skyU.turbidity.value      = 3.5;
-skyU.rayleigh.value       = 1.4;
-skyU.mieCoefficient.value = 0.005;
+skyU.turbidity.value       = 3.5;
+skyU.rayleigh.value        = 1.4;
+skyU.mieCoefficient.value  = 0.005;
 skyU.mieDirectionalG.value = 0.82;
 
 const sunDir = new THREE.Vector3();
 sunDir.setFromSphericalCoords(
   1,
-  THREE.MathUtils.degToRad(90 - 42),  // elevation
-  THREE.MathUtils.degToRad(188)        // azimuth
+  THREE.MathUtils.degToRad(90 - 42),
+  THREE.MathUtils.degToRad(188)
 );
 skyU.sunPosition.value.copy(sunDir);
 
 setProgress(15);
 
 // ─── Lighting ─────────────────────────────────────────────────────────────────
-// Sky colour top → ground colour bottom; provides natural fill on shadow sides
 const hemi = new THREE.HemisphereLight(0xc8dff0, 0x4a6630, 1.1);
 scene.add(hemi);
 
@@ -110,17 +206,14 @@ sunLight.shadow.camera.right  = sunLight.shadow.camera.top   =  220;
 sunLight.shadow.bias          = -0.0004;
 scene.add(sunLight);
 
-
 // ─── Terrain ──────────────────────────────────────────────────────────────────
-const WORLD  = 400;   // world size in units
-const SEGS   = 280;   // vertex grid resolution
-const NS     = 0.009; // noise spatial scale
-const HS     = 38;    // max height scale
+const WORLD  = 400;
+const SEGS   = 280;
+const NS     = 0.009;
+const HS     = 38;
 
-// Continuous height function used for both mesh and tree placement
 const getH = (x, z) => {
   let h = fbm(x * NS, z * NS) * HS;
-  // Flatten the central meadow
   const d = Math.sqrt(x * x + z * z) / 55;
   return h * Math.min(1, Math.max(0, d - 0.3));
 };
@@ -138,10 +231,10 @@ for (let i = 0; i < pos.count; i++) {
   pos.setY(i, h);
 
   const n = h / HS;
-  if      (n < 0.04) colTmp.setRGB(0.42, 0.60, 0.20);  // bright meadow
-  else if (n < 0.30) colTmp.setRGB(0.23, 0.41, 0.13);  // forest floor
-  else if (n < 0.62) colTmp.setRGB(0.30, 0.37, 0.18);  // upper woodland
-  else               colTmp.setRGB(0.50, 0.46, 0.36);  // rocky summit
+  if      (n < 0.04) colTmp.setRGB(0.42, 0.60, 0.20);
+  else if (n < 0.30) colTmp.setRGB(0.23, 0.41, 0.13);
+  else if (n < 0.62) colTmp.setRGB(0.30, 0.37, 0.18);
+  else               colTmp.setRGB(0.50, 0.46, 0.36);
   vColor[i * 3]     = colTmp.r;
   vColor[i * 3 + 1] = colTmp.g;
   vColor[i * 3 + 2] = colTmp.b;
@@ -151,9 +244,7 @@ terrGeo.setAttribute('color', new THREE.BufferAttribute(vColor, 3));
 terrGeo.computeVertexNormals();
 
 const terrain = new THREE.Mesh(terrGeo, new THREE.MeshStandardMaterial({
-  vertexColors: true,
-  roughness: 0.93,
-  metalness: 0.0,
+  vertexColors: true, roughness: 0.93, metalness: 0.0,
 }));
 terrain.receiveShadow = true;
 scene.add(terrain);
@@ -164,22 +255,15 @@ setProgress(40);
 const pondGeo = new THREE.CircleGeometry(16, 56);
 pondGeo.rotateX(-Math.PI / 2);
 const pondMat = new THREE.MeshStandardMaterial({
-  color: 0x2a6a90,
-  roughness: 0.06,
-  metalness: 0.08,
-  transparent: true,
-  opacity: 0.88,
+  color: 0x2a6a90, roughness: 0.06, metalness: 0.08, transparent: true, opacity: 0.88,
 });
 const pond = new THREE.Mesh(pondGeo, pondMat);
 pond.position.y = 0.18;
 scene.add(pond);
 
-// Shoreline dark ring
 const shoreGeo = new THREE.RingGeometry(15.5, 19, 56);
 shoreGeo.rotateX(-Math.PI / 2);
-const shore = new THREE.Mesh(shoreGeo, new THREE.MeshStandardMaterial({
-  color: 0x3a3220, roughness: 0.95
-}));
+const shore = new THREE.Mesh(shoreGeo, new THREE.MeshStandardMaterial({ color: 0x3a3220, roughness: 0.95 }));
 shore.position.y = 0.05;
 scene.add(shore);
 
@@ -190,20 +274,17 @@ const MAX_PINES = 380;
 const MAX_OAKS  = 260;
 
 const mats = {
-  pineTrunk:  new THREE.MeshStandardMaterial({ color: 0x5c3a1e, roughness: 0.93 }),
-  pineLeaf:   new THREE.MeshStandardMaterial({ color: 0x1a4020, roughness: 0.88 }),
-  oakTrunk:   new THREE.MeshStandardMaterial({ color: 0x4a2c0c, roughness: 0.95 }),
-  oakLeafA:   new THREE.MeshStandardMaterial({ color: 0x2e5c18, roughness: 0.87 }),
-  oakLeafB:   new THREE.MeshStandardMaterial({ color: 0x3a7020, roughness: 0.87 }),
+  pineTrunk: new THREE.MeshStandardMaterial({ color: 0x5c3a1e, roughness: 0.93 }),
+  pineLeaf:  new THREE.MeshStandardMaterial({ color: 0x1a4020, roughness: 0.88 }),
+  oakTrunk:  new THREE.MeshStandardMaterial({ color: 0x4a2c0c, roughness: 0.95 }),
+  oakLeafA:  new THREE.MeshStandardMaterial({ color: 0x2e5c18, roughness: 0.87 }),
+  oakLeafB:  new THREE.MeshStandardMaterial({ color: 0x3a7020, roughness: 0.87 }),
 };
 
-// Pine: trunk + 3 cone tiers
 const pineTrunkIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.28, 1, 6),  mats.pineTrunk, MAX_PINES);
 const pineC0IM    = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7),                mats.pineLeaf,  MAX_PINES);
 const pineC1IM    = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7),                mats.pineLeaf,  MAX_PINES);
 const pineC2IM    = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7),                mats.pineLeaf,  MAX_PINES);
-
-// Oak: trunk + 2 canopy spheres (different materials for colour variation)
 const oakTrunkIM  = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.22, 0.38, 1, 7),  mats.oakTrunk,  MAX_OAKS);
 const oakCapAIM   = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 9, 6),              mats.oakLeafA,  MAX_OAKS);
 const oakCapBIM   = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 9, 6),              mats.oakLeafB,  MAX_OAKS);
@@ -216,69 +297,40 @@ let pines = 0, oaks = 0;
 
 for (let attempt = 0; attempt < 8000; attempt++) {
   if (pines >= MAX_PINES && oaks >= MAX_OAKS) break;
-
   const x  = (rng() - 0.5) * WORLD * 0.92;
   const z  = (rng() - 0.5) * WORLD * 0.92;
   const h  = getH(x, z);
   const d2 = x * x + z * z;
-
-  if (d2 < 22 * 22) continue;   // keep meadow clear
-  if (h < 1.2)       continue;   // no trees on flat lowland
-  if (h > 33)        continue;   // no trees above treeline
-
+  if (d2 < 22 * 22) continue;
+  if (h < 1.2 || h > 33) continue;
   const wantPine = h > 16;
 
   if (wantPine && pines < MAX_PINES) {
-    const s = 2.8 + rng() * 2.8;
-    const th = s * 1.1;
-    const ry = rng() * Math.PI * 2;
+    const s = 2.8 + rng() * 2.8, th = s * 1.1, ry = rng() * Math.PI * 2;
     const jx = (rng() - 0.5) * 0.5, jz = (rng() - 0.5) * 0.5;
-
-    dummy.position.set(x + jx, h + th * 0.5, z + jz);
-    dummy.scale.set(s * 0.55, th, s * 0.55);
-    dummy.rotation.y = ry; dummy.updateMatrix();
+    dummy.position.set(x+jx, h+th*0.5, z+jz); dummy.scale.set(s*0.55, th, s*0.55); dummy.rotation.y=ry; dummy.updateMatrix();
     pineTrunkIM.setMatrixAt(pines, dummy.matrix);
-
-    const cIMs = [pineC0IM, pineC1IM, pineC2IM];
-    for (let t = 0; t < 3; t++) {
-      const cr = (1.85 - t * 0.42) * s;
-      const cy = h + th + t * 1.35 * s;
-      dummy.position.set(x + jx, cy, z + jz);
-      dummy.scale.set(cr, 2.1 * s, cr);
-      dummy.rotation.y = ry; dummy.updateMatrix();
-      cIMs[t].setMatrixAt(pines, dummy.matrix);
-    }
+    [[1.85,0],[1.43,1],[1.01,2]].forEach(([r,t]) => {
+      dummy.position.set(x+jx, h+th+t*1.35*s, z+jz); dummy.scale.set(r*s, 2.1*s, r*s); dummy.rotation.y=ry; dummy.updateMatrix();
+      [pineC0IM,pineC1IM,pineC2IM][t].setMatrixAt(pines, dummy.matrix);
+    });
     pines++;
-
   } else if (!wantPine && oaks < MAX_OAKS) {
-    const s  = 2.2 + rng() * 2.2;
-    const th = s * 0.85;
-    const ry = rng() * Math.PI * 2;
-
-    dummy.position.set(x, h + th * 0.5, z);
-    dummy.scale.set(s * 0.45, th, s * 0.45);
-    dummy.rotation.y = ry; dummy.updateMatrix();
+    const s = 2.2 + rng() * 2.2, th = s * 0.85, ry = rng() * Math.PI * 2;
+    dummy.position.set(x, h+th*0.5, z); dummy.scale.set(s*0.45, th, s*0.45); dummy.rotation.y=ry; dummy.updateMatrix();
     oakTrunkIM.setMatrixAt(oaks, dummy.matrix);
-
-    const crA = (1.5 + rng() * 0.7) * s;
-    dummy.position.set(x + (rng() - 0.5) * s * 0.4, h + th + crA * 0.55, z + (rng() - 0.5) * s * 0.4);
-    dummy.scale.set(crA, crA * 0.85, crA);
-    dummy.rotation.y = ry; dummy.updateMatrix();
+    const crA = (1.5+rng()*0.7)*s;
+    dummy.position.set(x+(rng()-0.5)*s*0.4, h+th+crA*0.55, z+(rng()-0.5)*s*0.4); dummy.scale.set(crA,crA*0.85,crA); dummy.rotation.y=ry; dummy.updateMatrix();
     oakCapAIM.setMatrixAt(oaks, dummy.matrix);
-
-    const crB = (1.2 + rng() * 0.6) * s;
-    dummy.position.set(x + (rng() - 0.5) * s * 0.5, h + th + crA * 0.7 + crB * 0.4, z + (rng() - 0.5) * s * 0.5);
-    dummy.scale.set(crB, crB * 0.75, crB);
-    dummy.rotation.y = ry; dummy.updateMatrix();
+    const crB = (1.2+rng()*0.6)*s;
+    dummy.position.set(x+(rng()-0.5)*s*0.5, h+th+crA*0.7+crB*0.4, z+(rng()-0.5)*s*0.5); dummy.scale.set(crB,crB*0.75,crB); dummy.rotation.y=ry; dummy.updateMatrix();
     oakCapBIM.setMatrixAt(oaks, dummy.matrix);
-
     oaks++;
   }
 }
 
-// Commit counts and matrices
-pineTrunkIM.count = pines; pineC0IM.count = pines; pineC1IM.count = pines; pineC2IM.count = pines;
-oakTrunkIM.count  = oaks;  oakCapAIM.count = oaks; oakCapBIM.count = oaks;
+pineTrunkIM.count=pines; pineC0IM.count=pines; pineC1IM.count=pines; pineC2IM.count=pines;
+oakTrunkIM.count=oaks;   oakCapAIM.count=oaks;  oakCapBIM.count=oaks;
 allIMs.forEach(m => { m.instanceMatrix.needsUpdate = true; });
 
 setProgress(80);
@@ -292,48 +344,38 @@ const rockIM = new THREE.InstancedMesh(
 );
 rockIM.castShadow = rockIM.receiveShadow = true;
 scene.add(rockIM);
-
 let rocks = 0;
 for (let i = 0; i < MAX_ROCKS * 4 && rocks < MAX_ROCKS; i++) {
-  const x = (rng() - 0.5) * WORLD * 0.88;
-  const z = (rng() - 0.5) * WORLD * 0.88;
+  const x = (rng()-0.5)*WORLD*0.88, z = (rng()-0.5)*WORLD*0.88;
   const h = getH(x, z);
   if (h < 0.6) continue;
   const s = 0.28 + rng() * 1.0;
-  dummy.position.set(x, h + s * 0.4, z);
-  dummy.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
-  dummy.scale.setScalar(s);
-  dummy.updateMatrix();
+  dummy.position.set(x, h+s*0.4, z);
+  dummy.rotation.set(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
+  dummy.scale.setScalar(s); dummy.updateMatrix();
   rockIM.setMatrixAt(rocks++, dummy.matrix);
 }
 rockIM.count = rocks;
 rockIM.instanceMatrix.needsUpdate = true;
 
 // ─── Grass tufts ──────────────────────────────────────────────────────────────
-// Flat crossed quads as simple billboard grass blades in the clearing
-const MAX_GRASS  = 2000;
-const grassMat   = new THREE.MeshStandardMaterial({
-  color: 0x4a8030, roughness: 0.95, side: THREE.DoubleSide,
-  alphaTest: 0.3,
-});
-const grassPlane = new THREE.PlaneGeometry(0.6, 0.9);
-const grassIM    = new THREE.InstancedMesh(grassPlane, grassMat, MAX_GRASS * 2);
+const MAX_GRASS = 2000;
+const grassIM   = new THREE.InstancedMesh(
+  new THREE.PlaneGeometry(0.6, 0.9),
+  new THREE.MeshStandardMaterial({ color: 0x4a8030, roughness: 0.95, side: THREE.DoubleSide, alphaTest: 0.3 }),
+  MAX_GRASS * 2
+);
 grassIM.receiveShadow = true;
 scene.add(grassIM);
-
 let gCount = 0;
 for (let i = 0; i < MAX_GRASS; i++) {
-  // Polar sampling to concentrate grass in the clearing
-  const angle = rng() * Math.PI * 2;
-  const r     = rng() * 18;
-  const x = Math.cos(angle) * r, z = Math.sin(angle) * r;
+  const angle = rng()*Math.PI*2, r = rng()*18;
+  const x = Math.cos(angle)*r, z = Math.sin(angle)*r;
   const h = getH(x, z) + 0.42;
-
-  for (let pass = 0; pass < 2; pass++) {
+  for (let p = 0; p < 2; p++) {
     dummy.position.set(x, h, z);
-    dummy.rotation.set(0, pass * Math.PI / 2 + rng() * 0.6, 0);
-    dummy.scale.setScalar(0.6 + rng() * 0.6);
-    dummy.updateMatrix();
+    dummy.rotation.set(0, p*Math.PI/2+rng()*0.6, 0);
+    dummy.scale.setScalar(0.6+rng()*0.6); dummy.updateMatrix();
     grassIM.setMatrixAt(gCount++, dummy.matrix);
   }
 }
@@ -350,13 +392,28 @@ window.addEventListener('resize', () => {
 });
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
-const clock = new THREE.Clock();
+const clock   = new THREE.Clock();
+const _right  = new THREE.Vector3();
+const _fwd    = new THREE.Vector3();
 let firstFrame = true;
-let elapsed = 0;
-let bobPhase = 0;
+let elapsed    = 0;
+let bobPhase   = 0;
+let smoothY    = 2.5;
 
-// Smooth camera Y to avoid snapping on steep terrain
-let smoothY = 2.5;
+function moveAndFollow(delta, moving, speed) {
+  const p = camera.position;
+  p.x = Math.max(-WORLD/2+4, Math.min(WORLD/2-4, p.x));
+  p.z = Math.max(-WORLD/2+4, Math.min(WORLD/2-4, p.z));
+  const targetY = getH(p.x, p.z) + 1.72;
+  smoothY += (targetY - smoothY) * Math.min(1, delta * 14);
+  if (moving) {
+    bobPhase += delta * speed * 1.1;
+    p.y = smoothY + Math.sin(bobPhase) * 0.055;
+  } else {
+    bobPhase = 0;
+    p.y = smoothY;
+  }
+}
 
 function animate() {
   requestAnimationFrame(animate);
@@ -370,45 +427,44 @@ function animate() {
   const delta = Math.min(clock.getDelta(), 0.05);
   elapsed += delta;
 
-  // ── Player movement ─────────────────────────────────────────────────────────
-  if (controls.isLocked) {
-    const sprint = keys['ShiftLeft'] || keys['ShiftRight'];
-    const speed  = sprint ? 20 : 8;
-    const moving =
-      keys['KeyW'] || keys['ArrowUp']   ||
-      keys['KeyS'] || keys['ArrowDown'] ||
-      keys['KeyA'] || keys['ArrowLeft'] ||
-      keys['KeyD'] || keys['ArrowRight'];
+  if (gameActive) {
+    if (!isMobile) {
+      // ── Desktop WASD ────────────────────────────────────────────────────────
+      const sprint  = keys['ShiftLeft'] || keys['ShiftRight'];
+      const speed   = sprint ? 20 : 8;
+      const moving  = keys['KeyW']||keys['ArrowUp']||keys['KeyS']||keys['ArrowDown']||
+                      keys['KeyA']||keys['ArrowLeft']||keys['KeyD']||keys['ArrowRight'];
 
-    if (keys['KeyW'] || keys['ArrowUp'])    controls.moveForward( speed * delta);
-    if (keys['KeyS'] || keys['ArrowDown'])  controls.moveForward(-speed * delta);
-    if (keys['KeyA'] || keys['ArrowLeft'])  controls.moveRight(  -speed * delta);
-    if (keys['KeyD'] || keys['ArrowRight']) controls.moveRight(   speed * delta);
+      if (keys['KeyW']||keys['ArrowUp'])    plControls.moveForward( speed * delta);
+      if (keys['KeyS']||keys['ArrowDown'])  plControls.moveForward(-speed * delta);
+      if (keys['KeyA']||keys['ArrowLeft'])  plControls.moveRight(  -speed * delta);
+      if (keys['KeyD']||keys['ArrowRight']) plControls.moveRight(   speed * delta);
 
-    // Clamp to world boundary
-    const p = camera.position;
-    p.x = Math.max(-WORLD / 2 + 4, Math.min(WORLD / 2 - 4, p.x));
-    p.z = Math.max(-WORLD / 2 + 4, Math.min(WORLD / 2 - 4, p.z));
+      moveAndFollow(delta, moving, speed);
 
-    // Terrain-follow: smoothly track ground height
-    const groundH = getH(p.x, p.z);
-    const targetY = groundH + 1.72;
-    smoothY += (targetY - smoothY) * Math.min(1, delta * 14);
-
-    // Head bob while walking
-    if (moving) {
-      const bobSpeed = sprint ? 14 : 9;
-      bobPhase += delta * bobSpeed;
-      p.y = smoothY + Math.sin(bobPhase) * 0.055;
     } else {
-      bobPhase = 0;
-      p.y = smoothY;
+      // ── Mobile touch ────────────────────────────────────────────────────────
+      camera.rotation.y = mYaw;
+      camera.rotation.x = mPitch;
+
+      const moving = joy.active && (joy.dx !== 0 || joy.dy !== 0);
+      if (moving) {
+        const speed = 8;
+        const jx = joy.dx / JMAX;
+        const jy = joy.dy / JMAX;
+
+        _right.setFromMatrixColumn(camera.matrix, 0);
+        _fwd.crossVectors(camera.up, _right);
+
+        camera.position.addScaledVector(_fwd,   -jy * speed * delta);
+        camera.position.addScaledVector(_right,  jx * speed * delta);
+      }
+
+      moveAndFollow(delta, moving, 8);
     }
   }
 
-  // Subtle pond shimmer
   pondMat.color.setHSL(0.575, 0.52, 0.225 + Math.sin(elapsed * 0.7) * 0.018);
-
   renderer.render(scene, camera);
 }
 
