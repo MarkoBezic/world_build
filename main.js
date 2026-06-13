@@ -603,20 +603,117 @@ cyl(CX + 22, BY + 5.4, CZ_C + 28, 2.5, 2.5, 0.6, 10, darkStoneMat);
 });
 box(CX + 22, BY + 9.0, CZ_C + 28, 5.5, 0.4, 2.0, woodMat);
 
-// Ruined inner chapel (partial crumbled building adds atmosphere)
-box(CX - 42, BY + 9, CZ_C + 12, 4, 18, 32, stoneMat);
-box(CX - 42, BY + 4.5, CZ_C - 4, 24, 9, 4, stoneMat);
+// ─── Ruined chapel — crumbled west-wing outbuilding ──────────────────────────
+const chX = CX - 52, chZ = CZ_C - 22;
+box(chX,      BY + 11,  chZ,       3.5, 22, 32, stoneMat);   // west wall — full height survives
+box(chX + 14, BY + 6.5, chZ - 14,  28,  13, 3.5, stoneMat);  // north wall — half collapsed
+box(chX + 8,  BY + 3.5, chZ + 14,  18,   7, 3.5, stoneMat);  // south wall — low rubble
+box(chX + 22, BY + 8,   chZ,        3.5, 16, 16, stoneMat);  // east corner — partially standing
+// Fallen column drums on the chapel floor
+for (let i = 0; i < 6; i++) {
+  cyl(chX + 5 + i*3.8 + (rng()-0.5)*1.5,
+      BY + 0.9 + rng()*0.4,
+      chZ - 4 + (rng()-0.5)*8,
+      0.85, 0.95, 1.8 + rng()*0.8, 8, darkStoneMat);
+}
 
-// Scattered boulders and rubble around the clearing
-for (let i = 0; i < 28; i++) {
-  const angle = rng()*Math.PI*2;
-  const r = 90 + rng()*50;
-  const bx = CX + Math.cos(angle)*r, bz = CZ_C + Math.sin(angle)*r;
-  if (bx < -WORLD*0.48 || bx > WORLD*0.48 || bz < -WORLD*0.48 || bz > WORLD*0.48) continue;
+// ─── Arrow slits on main curtain walls ───────────────────────────────────────
+// North outer wall — 5 slits
+for (let i = 0; i < 5; i++) {
+  box(CX - wallW*0.3 + i*(wallW*0.15), BY + 8, CZ_C - wallD*0.5 - 0.1, 1.4, 3.0, 0.5, darkStoneMat);
+}
+// East outer wall — 4 slits
+for (let i = 0; i < 4; i++) {
+  box(CX + wallW*0.5 + 0.1, BY + 8, CZ_C - wallD*0.3 + i*(wallD*0.2), 0.5, 3.0, 1.4, darkStoneMat);
+}
+// West outer wall — 4 slits
+for (let i = 0; i < 4; i++) {
+  box(CX - wallW*0.5 - 0.1, BY + 8, CZ_C - wallD*0.3 + i*(wallD*0.2), 0.5, 3.0, 1.4, darkStoneMat);
+}
+
+// ─── Courtyard props ──────────────────────────────────────────────────────────
+// Campfire ring — 8 small stones around a char patch
+const cfX = CX - 18, cfZ = CZ_C + 38;
+for (let i = 0; i < 8; i++) {
+  const a = (i / 8) * Math.PI * 2;
+  const cr = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45, 0), rockMat);
+  cr.position.set(cfX + Math.cos(a)*1.8, BY + 0.22, cfZ + Math.sin(a)*1.8);
+  cr.rotation.set(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
+  cr.castShadow = cr.receiveShadow = true;
+  scene.add(cr);
+}
+box(cfX, BY + 0.28, cfZ, 0.7, 0.56, 0.7, darkStoneMat);  // charred embers
+
+// Barrel cluster against east inner wall
+[-2.6, 0, 2.6].forEach(ox => {
+  cyl(CX + wallW*0.5 - wallT - 5, BY + 1.9, CZ_C + 22 + ox, 1.0, 1.1, 3.8, 10, woodMat);
+});
+
+// ─── Ivy — instanced planes climbing keep and hall exterior walls ─────────────
+const MAX_IVY = 320;
+const ivyIM = new THREE.InstancedMesh(
+  new THREE.PlaneGeometry(0.88, 1.18),
+  new THREE.MeshStandardMaterial({ color: 0x1e5010, roughness: 0.94, side: THREE.DoubleSide, alphaTest: 0.15 }),
+  MAX_IVY
+);
+ivyIM.receiveShadow = true;
+scene.add(ivyIM);
+let ivyCount = 0;
+
+function scatterIvy(wallCX, wallCZ, axis, faceSign, span) {
+  const passes = Math.floor(span / 1.4) * 3;
+  for (let i = 0; i < passes && ivyCount < MAX_IVY; i++) {
+    const t  = (rng() - 0.5) * span;
+    const iy = BY + 0.15 + rng() * 8.8;
+    const s  = 0.5 + rng() * 0.95;
+    const posX = axis === 'x' ? wallCX + t + (rng()-0.5)*0.3 : wallCX + faceSign * 0.08;
+    const posZ = axis === 'x' ? wallCZ + faceSign * 0.08     : wallCZ + t + (rng()-0.5)*0.3;
+    dummy.position.set(posX, iy, posZ);
+    dummy.rotation.set(
+      (rng()-0.5)*0.55,
+      axis === 'x'
+        ? (faceSign > 0 ? 0          : Math.PI)
+        : (faceSign > 0 ? Math.PI*0.5 : -Math.PI*0.5),
+      (rng()-0.5)*0.68
+    );
+    dummy.scale.setScalar(s);
+    dummy.updateMatrix();
+    ivyIM.setMatrixAt(ivyCount++, dummy.matrix);
+  }
+}
+
+// Keep exterior — all four faces
+scatterIvy(keepX,          keepZ + keepD*0.5,  'x', +1, keepW - wt*2);  // south (skip door)
+scatterIvy(keepX,          keepZ - keepD*0.5,  'x', -1, keepW);          // north
+scatterIvy(keepX + keepW*0.5, keepZ,           'z', +1, keepD);          // east
+scatterIvy(keepX - keepW*0.5, keepZ,           'z', -1, keepD);          // west
+// Great hall exterior
+scatterIvy(keepX,          keepZ + keepD*0.5 + hallD, 'x', +1, hallW);
+scatterIvy(keepX - hallW*0.5, keepZ + keepD*0.5 + hallD*0.5, 'z', -1, hallD);
+scatterIvy(keepX + hallW*0.5, keepZ + keepD*0.5 + hallD*0.5, 'z', +1, hallD);
+
+ivyIM.count = ivyCount;
+ivyIM.instanceMatrix.needsUpdate = true;
+
+// ─── Rubble — inside courtyard and scattered around clearing perimeter ────────
+for (let i = 0; i < 40; i++) {
+  let bx, bz;
+  if (i < 16) {
+    // Inside courtyard — random rubble piles near walls
+    bx = CX + (rng()-0.5) * (wallW - wallT*4);
+    bz = CZ_C + (rng()-0.5) * (wallD - wallT*4);
+    // Skip over well and campfire zones
+    if (Math.hypot(bx - (CX+22), bz - (CZ_C+28)) < 6) continue;
+  } else {
+    const angle = rng()*Math.PI*2, r = 78 + rng()*62;
+    bx = CX + Math.cos(angle)*r;
+    bz = CZ_C + Math.sin(angle)*r;
+  }
+  if (Math.abs(bx) > WORLD*0.47 || Math.abs(bz) > WORLD*0.47) continue;
   const bh = getH(bx, bz);
-  const bs = 0.6 + rng()*2.0;
+  const bs = 0.35 + rng()*1.9;
   const boulder = new THREE.Mesh(new THREE.DodecahedronGeometry(bs, 1), rockMat);
-  boulder.position.set(bx, bh + bs*0.38, bz);
+  boulder.position.set(bx, bh + bs*0.35, bz);
   boulder.rotation.set(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
   boulder.castShadow = boulder.receiveShadow = true;
   scene.add(boulder);
