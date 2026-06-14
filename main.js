@@ -631,6 +631,22 @@ battlements(keepX, BY + hallH, keepZ + keepD*0.5 + hallD, hallW, wallT, 'x', dar
 battlements(keepX - hallW*0.5, BY + hallH, keepZ + keepD*0.5 + hallD*0.5, hallD, wallT, 'z', darkStoneMat);
 battlements(keepX + hallW*0.5, BY + hallH, keepZ + keepD*0.5 + hallD*0.5, hallD, wallT, 'z', darkStoneMat);
 
+// Keep south entrance — wooden door leaves
+[-1, 1].forEach(side => {
+  box(keepX + side * (keepDoorW*0.25 + 0.05),
+      BY + (keepDoorH - 0.5)*0.5 + 0.25,
+      keepZ + keepD*0.5 - wt*0.5 - 0.3,
+      keepDoorW*0.5 - 0.3, keepDoorH - 0.5, 0.4, woodMat);
+});
+
+// Great hall south entrance — wooden door leaves
+[-1, 1].forEach(side => {
+  box(keepX + side * (hallDoorW*0.25 + 0.05),
+      BY + (hallDoorH - 0.5)*0.5 + 0.25,
+      keepZ + keepD*0.5 + hallD - wt*0.5 - 0.3,
+      hallDoorW*0.5 - 0.3, hallDoorH - 0.5, 0.4, woodMat);
+});
+
 // Courtyard well
 cyl(CX + 22, BY + 1.8, CZ_C + 28, 2.2, 2.2, 3.6, 10, stoneMat);
 cyl(CX + 22, BY + 5.4, CZ_C + 28, 2.5, 2.5, 0.6, 10, darkStoneMat);
@@ -976,6 +992,234 @@ const sporePoints = new THREE.Points(sporeGeo, new THREE.PointsMaterial({
 }));
 scene.add(sporePoints);
 
+// ─── OpenText Building ────────────────────────────────────────────────────────
+let bldBY = 0;   // set by createOpenTextBuilding(), read by getFloorH
+// Phase 1: Foundation pad, parking lot, concrete structural frame
+function createOpenTextBuilding() {
+  const BX = 0, BZ = 200;  // building centre — south of spawn
+  const BW = 80, BD = 60;  // footprint: 80 wide (X) × 60 deep (Z)
+  const BH = 36;            // body height: 6 floors × 6 units
+  const FL = 6;             // floor-to-floor height
+  const SH = 1.8;           // concrete spandrel band height
+  const CT = 3.0;           // column / spandrel depth
+
+  // Sample highest terrain point under footprint so pad always rises above it
+  let maxH = 0;
+  for (let sx = -44; sx <= 44; sx += 8) {
+    for (let sz = -34; sz <= 34; sz += 8) {
+      maxH = Math.max(maxH, getH(BX + sx, BZ + sz));
+    }
+  }
+  const BY = maxH + 1;   // building base sits 1 unit above highest terrain
+
+  const concMat    = new THREE.MeshStandardMaterial({ color: 0xe0dcd0, roughness: 0.86, metalness: 0.0 });
+  const asphaltMat = new THREE.MeshStandardMaterial({ color: 0x1e1e20, roughness: 0.97, metalness: 0.0 });
+
+  // Thick concrete foundation — buries into terrain so no gaps are visible
+  box(BX, BY - 12, BZ, BW + 12, 24, BD + 12, concMat);
+
+  // Asphalt parking lot north of the entrance (front face = z = BZ - BD/2)
+  const frontZ  = BZ - BD * 0.5;   // = 170
+  const lotD    = 56;               // parking lot depth (toward player)
+  box(BX, BY + 0.3, frontZ - lotD * 0.5, BW + 28, 0.6, lotD, asphaltMat);
+
+  // Raised concrete curb / sidewalk at building base
+  box(BX, BY + 0.8, frontZ - 2.5, BW + 6, 1.2, 4, concMat);
+
+  // Column X positions — 7 columns across 80-unit width (6 bays of ~13.3 units)
+  const colXs = [-40, -26.7, -13.3, 0, 13.3, 26.7, 40].map(dx => BX + dx);
+  // Column Z positions on east/west faces — 5 columns over 60-unit depth
+  const colZs = [-30, -15, 0, 15, 30].map(dz => BZ + dz);
+
+  // Vertical columns — front face (z = BZ - 30)
+  colXs.forEach(cx => box(cx, BY + BH * 0.5, BZ - BD * 0.5, CT, BH, CT, concMat));
+  // Vertical columns — back face  (z = BZ + 30)
+  colXs.forEach(cx => box(cx, BY + BH * 0.5, BZ + BD * 0.5, CT, BH, CT, concMat));
+  // Vertical columns — west face (x = BX - 40), corners already covered above
+  colZs.slice(1, -1).forEach(cz => box(BX - BW * 0.5, BY + BH * 0.5, cz, CT, BH, CT, concMat));
+  // Vertical columns — east face (x = BX + 40)
+  colZs.slice(1, -1).forEach(cz => box(BX + BW * 0.5, BY + BH * 0.5, cz, CT, BH, CT, concMat));
+
+  // Horizontal spandrel bands — at every floor junction (ground → floor 6 = roof level)
+  for (let f = 0; f <= 6; f++) {
+    const sy = BY + f * FL + SH * 0.5;
+    box(BX,           sy, BZ - BD * 0.5, BW, SH, CT, concMat);  // front
+    box(BX,           sy, BZ + BD * 0.5, BW, SH, CT, concMat);  // back
+    box(BX - BW * 0.5, sy, BZ, CT, SH, BD, concMat);            // west
+    box(BX + BW * 0.5, sy, BZ, CT, SH, BD, concMat);            // east
+  }
+
+  // Roof parapet ring (4-unit tall raised band above BH)
+  const RP = 4;
+  box(BX,            BY + BH + RP * 0.5, BZ - BD * 0.5, BW + 2, RP, CT + 1, concMat);
+  box(BX,            BY + BH + RP * 0.5, BZ + BD * 0.5, BW + 2, RP, CT + 1, concMat);
+  box(BX - BW * 0.5, BY + BH + RP * 0.5, BZ, CT + 1, RP, BD + 2, concMat);
+  box(BX + BW * 0.5, BY + BH + RP * 0.5, BZ, CT + 1, RP, BD + 2, concMat);
+  // Flat roof slab
+  box(BX, BY + BH - 0.3, BZ, BW - CT * 2, 0.6, BD - CT * 2, concMat);
+
+  // Phase 2 — Dark glass curtain wall: back, east, west faces
+  // Front (entrance) face is handled separately in Phase 3 (curved facade)
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0x1a3050, roughness: 0.05, metalness: 0.78,
+    transparent: true, opacity: 0.70,
+  });
+  const gh = FL - SH - 0.1;   // glazing panel height (slight clearance from spandrels)
+
+  for (let f = 0; f < 6; f++) {
+    const gy = BY + f * FL + SH + gh * 0.5;   // panel centre Y
+
+    // Back face panels (6 bays)
+    for (let b = 0; b < 6; b++) {
+      const gx = (colXs[b] + colXs[b + 1]) * 0.5;
+      const gw = (colXs[b + 1] - colXs[b]) - CT;
+      box(gx, gy, BZ + BD * 0.5, gw, gh, 0.35, glassMat);
+    }
+
+    // East and west face panels (4 bays each)
+    for (let b = 0; b < 4; b++) {
+      const gz = (colZs[b] + colZs[b + 1]) * 0.5;
+      const gd = (colZs[b + 1] - colZs[b]) - CT;
+      box(BX + BW * 0.5, gy, gz, 0.35, gh, gd, glassMat);
+      box(BX - BW * 0.5, gy, gz, 0.35, gh, gd, glassMat);
+    }
+  }
+
+  // Phase 3 — Front facade: 25% flat | 50% curved | 25% flat
+  // The curved arc covers only the centre 50% (arcHalfW = BW*0.25 on each side of BX)
+  const arcHalfW  = BW * 0.25;   // = 20: curved zone spans BX ± 20
+  const protrusion = 8;           // gentle 8-unit forward bow
+  const nFacets   = 8;
+  const R_c       = (arcHalfW * arcHalfW + protrusion * protrusion) / (2 * protrusion); // = 29
+  const arcCZ     = frontZ - protrusion + R_c;
+  const halfAngle = Math.asin(arcHalfW / R_c);
+  const segAngle  = 2 * halfAngle / nFacets;
+  const chordW    = 2 * R_c * Math.sin(segAngle * 0.5);
+
+  // ── Flat left section: x from BX-40 to BX-20, at z = frontZ ──
+  for (let f = 0; f < 6; f++) {
+    const gy = BY + f * FL + SH + gh * 0.5;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(arcHalfW - CT, gh, 0.35), glassMat);
+    m.position.set(BX - BW * 0.5 + arcHalfW * 0.5, gy, frontZ);
+    m.castShadow = m.receiveShadow = true;
+    scene.add(m);
+  }
+
+  // ── Flat right section: x from BX+20 to BX+40, at z = frontZ ──
+  for (let f = 0; f < 6; f++) {
+    const gy = BY + f * FL + SH + gh * 0.5;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(arcHalfW - CT, gh, 0.35), glassMat);
+    m.position.set(BX + BW * 0.5 - arcHalfW * 0.5, gy, frontZ);
+    m.castShadow = m.receiveShadow = true;
+    scene.add(m);
+  }
+
+  // Transition columns at the flat-to-curved boundary (BX ± arcHalfW, z = frontZ)
+  [-1, 1].forEach(side => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(CT, BH, CT), concMat);
+    m.position.set(BX + side * arcHalfW, BY + BH * 0.5, frontZ);
+    m.castShadow = m.receiveShadow = true;
+    scene.add(m);
+  });
+
+  // ── Curved centre section: 8 facets spanning BX ± arcHalfW, bowing 8 units forward ──
+  for (let i = 0; i < nFacets; i++) {
+    const t  = -halfAngle + (i + 0.5) * segAngle;
+    const fx = BX + R_c * Math.sin(t);
+    const fz = arcCZ - R_c * Math.cos(t);
+    const ry = Math.PI - t;   // outward-facing normal
+
+    // Curved spandrel bands
+    for (let f = 0; f <= 6; f++) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(chordW + 0.15, SH, CT), concMat);
+      m.position.set(fx, BY + f * FL + SH * 0.5, fz);
+      m.rotation.y = ry;
+      m.castShadow = m.receiveShadow = true;
+      scene.add(m);
+    }
+
+    // Curved glass — 4 centre facets open at ground floor (entrance opening)
+    const isEntrance = i >= 2 && i <= 5;
+    for (let f = isEntrance ? 1 : 0; f < 6; f++) {
+      const gy = BY + f * FL + SH + gh * 0.5;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(chordW - 0.1, gh, 0.35), glassMat);
+      m.position.set(fx, gy, fz);
+      m.rotation.y = ry;
+      m.castShadow = m.receiveShadow = true;
+      scene.add(m);
+    }
+  }
+
+  // Columns along curved facade at each facet boundary (9 total, endpoints land at BX ± arcHalfW)
+  for (let i = 0; i <= nFacets; i++) {
+    const t  = -halfAngle + i * segAngle;
+    const cx = BX + R_c * Math.sin(t);
+    const cz = arcCZ - R_c * Math.cos(t);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(CT, BH, CT), concMat);
+    m.position.set(cx, BY + BH * 0.5, cz);
+    m.rotation.y = Math.PI - t;
+    m.castShadow = m.receiveShadow = true;
+    scene.add(m);
+  }
+
+  // Entrance canopy — spans the 4 centre entrance facets
+  const apexZ   = frontZ - protrusion;       // front-most arc point
+  const canopyW = chordW * 4 + 2;            // ≈ 24 units wide
+  const canopyY = BY + FL + 0.5;
+  box(BX, canopyY, apexZ - 2, canopyW, 0.8, 10, concMat);
+  const pillarX = canopyW * 0.5 - 1.2;
+  box(BX - pillarX, BY + FL * 0.5, apexZ - 1.5, 0.8, FL, 0.8, concMat);
+  box(BX + pillarX, BY + FL * 0.5, apexZ - 1.5, 0.8, FL, 0.8, concMat);
+
+  // Phase 4 — Roof cornice cap + sign boards
+
+  const signDarkMat  = new THREE.MeshStandardMaterial({ color: 0x18181e, roughness: 0.88, metalness: 0.04 });
+  const signLightMat = new THREE.MeshStandardMaterial({ color: 0xf0ece0, roughness: 0.72, metalness: 0.0  });
+
+  // Thin overhanging cornice slab at very top of parapet (BY + BH + RP = BY + 40)
+  box(BX, BY + BH + RP + 0.5, BZ, BW + 8, 1.0, BD + 8, concMat);
+
+  // Roof-level "OPEN TEXT" sign — mounted on north face of parapet, centred on curved section
+  // Parapet front (north) face sits at z = frontZ - (CT + 1) * 0.5
+  const parapetFaceZ = frontZ - (CT + 1) * 0.5;
+  const signW  = arcHalfW * 2 - 6;        // 34 units wide, spans curved section
+  const signH  = 3.2;
+  const signCY = BY + BH + RP * 0.5;      // vertically centred on parapet (BY + 38)
+  box(BX, signCY, parapetFaceZ - 0.3, signW, signH, 0.3, signDarkMat);       // dark backing
+  box(BX, signCY, parapetFaceZ - 0.48, signW - 3, signH - 1.0, 0.15, signLightMat); // light inner panel
+
+  // East-face corner sign (visible from east view per reference)
+  const eastFaceX = BX + BW * 0.5 + (CT + 1) * 0.5;
+  box(eastFaceX + 0.3, signCY, BZ - BD * 0.15, 0.3, signH, 18, signDarkMat);
+  box(eastFaceX + 0.48, signCY, BZ - BD * 0.15, 0.15, signH - 1.0, 15, signLightMat);
+
+  // Lobby-level sign — dark panel above entrance canopy at arc apex
+  const lobbySignY = canopyY + 2.2;       // above canopy top
+  box(BX, lobbySignY, apexZ - 0.3, 22, 2.2, 0.3, signDarkMat);
+  box(BX, lobbySignY, apexZ - 0.48, 20,  1.4, 0.15, signLightMat);
+
+  // Phase 5 — Collision boxes + expose base height for getFloorH
+  bldBY = BY;
+
+  const fz = frontZ;              // 170  — flat face Z
+  const az = fz - protrusion;     // 162  — arc apex Z (entrance face)
+  const T  = CT + 0.5;            // collision half-thickness
+
+  collBoxes.push(
+    // South (back) wall
+    [BX - BW*0.5 - 1, BX + BW*0.5 + 1, BZ + BD*0.5 - T, BZ + BD*0.5 + T],
+    // East wall — full depth from arc zone to back
+    [BX + BW*0.5 - T, BX + BW*0.5 + T, az,               BZ + BD*0.5 + 1],
+    // West wall
+    [BX - BW*0.5 - T, BX - BW*0.5 + T, az,               BZ + BD*0.5 + 1],
+    // Front left  — flat section + left arc, open centre entrance (x > -10)
+    [BX - BW*0.5 - 1, BX - 10,          az - 1,           fz + T],
+    // Front right — symmetric
+    [BX + 10,         BX + BW*0.5 + 1,  az - 1,           fz + T]
+  );
+}
+createOpenTextBuilding();
+
 setProgress(100);
 
 // ─── Resize ───────────────────────────────────────────────────────────────────
@@ -1017,6 +1261,8 @@ function getFloorH(px, pz) {
       pz >= keepZ + keepD*0.5 - wt - 0.3 && pz <= keepZ + keepD*0.5 + 0.3) return kTop; // south-left
   if (px >  keepX + keepDoorW*0.5     && px <= keepX + keepW*0.5 + 0.3 &&
       pz >= keepZ + keepD*0.5 - wt - 0.3 && pz <= keepZ + keepD*0.5 + 0.3) return kTop; // south-right
+  // OpenText building — flat asphalt/concrete surface covering parking lot + interior
+  if (bldBY > 0 && Math.abs(px) < 55 && pz > 113 && pz < 231) return bldBY + 0.65;
   return getH(px, pz);
 }
 
