@@ -736,7 +736,7 @@ const moW = miW - moatW;   // outer west x    (≈ -118.5)
 const bridgeHW = gateW * 0.5;  // half-width of bridge gap (= 8)
 
 const moatMat = new THREE.MeshStandardMaterial({
-  color: 0x1a3d52, roughness: 0.06, metalness: 0.18,
+  color: 0x2a6dbb, roughness: 0.06, metalness: 0.18,
   transparent: true, opacity: 0.88,
 });
 
