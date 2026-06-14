@@ -744,6 +744,11 @@ const collBoxes = [
   // Great hall — east / west walls (full depth)
   [keepX + hallW*0.5 - 2,      keepX + hallW*0.5 + 2,      keepZ + keepD*0.5,             keepZ + keepD*0.5 + hallD],
   [keepX - hallW*0.5 - 2,      keepX - hallW*0.5 + 2,      keepZ + keepD*0.5,             keepZ + keepD*0.5 + hallD],
+  // Ruined chapel — four surviving wall segments
+  [chX - 1.75,  chX + 1.75,   chZ - 16,    chZ + 16   ],   // west wall (tallest survivor)
+  [chX,         chX + 28,     chZ - 15.75, chZ - 12.25],   // north wall (half-collapsed)
+  [chX - 1,     chX + 17,     chZ + 12.25, chZ + 15.75],   // south wall (low rubble)
+  [chX + 20.25, chX + 23.75,  chZ - 8,     chZ + 8    ],   // east corner (partial)
 ];
 // Cylinder obstacles [cx, cz, radius] — towers and keep turrets
 const collCyls = [
@@ -755,6 +760,8 @@ const collCyls = [
   // Keep corner turrets
   [keepX - keepW*0.5, keepZ - keepD*0.5, ktR], [keepX + keepW*0.5, keepZ - keepD*0.5, ktR],
   [keepX - keepW*0.5, keepZ + keepD*0.5, ktR], [keepX + keepW*0.5, keepZ + keepD*0.5, ktR],
+  // Courtyard well
+  [CX + 22, CZ_C + 28, 2.2],
 ];
 
 function isColliding(px, pz) {
