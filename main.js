@@ -841,7 +841,7 @@ let elapsed    = 0;
 let bobPhase   = 0;
 let smoothY    = 2.5;
 const vel      = new THREE.Vector3();
-const PLAYER_R = 0.5;
+const PLAYER_R = 1.2;
 
 // Returns the walkable floor height at world position (px, pz).
 // Checks the staircase ramp first, then keep wall-walks, then terrain.
