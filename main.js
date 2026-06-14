@@ -55,6 +55,9 @@ const hint      = document.getElementById('hint');
 let gameActive  = false;
 let plControls  = null;
 const keys      = {};
+let mapVisible  = false;
+const mapCanvas = document.getElementById('minimap');
+const mapCtx    = mapCanvas.getContext('2d');
 
 if (!isMobile) {
   overlay.innerHTML = `
@@ -65,13 +68,20 @@ if (!isMobile) {
       <div class="key">A</div><div class="key">S</div><div class="key">D</div>
       <div class="key shift">⇧ Sprint</div>
       <div class="key wide">Esc — release cursor</div>
+      <div class="key wide">M — toggle map</div>
     </div>`;
   plControls = new PointerLockControls(camera, document.body);
   overlay.addEventListener('click', () => plControls.lock());
   plControls.addEventListener('lock',   () => { gameActive = true;  overlay.classList.add('hidden');    crosshair.classList.add('visible');    hint.classList.add('visible'); });
   plControls.addEventListener('unlock', () => { gameActive = false; overlay.classList.remove('hidden'); crosshair.classList.remove('visible'); hint.classList.remove('visible'); });
-  window.addEventListener('keydown', e => { keys[e.code] = true; });
-  window.addEventListener('keyup',   e => { keys[e.code] = false; });
+  window.addEventListener('keydown', e => {
+    keys[e.code] = true;
+    if (e.code === 'KeyM') {
+      mapVisible = !mapVisible;
+      mapCanvas.classList.toggle('visible', mapVisible);
+    }
+  });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
 } else {
   overlay.innerHTML = `
     <h1>The Forest World</h1>
@@ -1006,6 +1016,84 @@ function moveAndFollow(delta, moving, speed) {
   }
 }
 
+function drawMap() {
+  const S   = 220;
+  const ctx = mapCtx;
+  const toX = wx => (wx + WORLD * 0.5) / WORLD * S;
+  const toZ = wz => (wz + WORLD * 0.5) / WORLD * S;
+
+  ctx.clearRect(0, 0, S, S);
+
+  // Forest base
+  ctx.fillStyle = '#152810';
+  ctx.fillRect(0, 0, S, S);
+
+  // Moat water
+  ctx.fillStyle = '#2a6dbb';
+  ctx.fillRect(toX(moW), toZ(moN), toX(moE) - toX(moW), toZ(moS) - toZ(moN));
+
+  // Castle courtyard
+  ctx.fillStyle = '#4a3d28';
+  ctx.fillRect(toX(CX - wallW*0.5), toZ(CZ_C - wallD*0.5),
+               toX(CX + wallW*0.5) - toX(CX - wallW*0.5),
+               toZ(CZ_C + wallD*0.5) - toZ(CZ_C - wallD*0.5));
+
+  // Outer curtain wall outline
+  ctx.strokeStyle = '#9a8878';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(toX(CX - wallW*0.5), toZ(CZ_C - wallD*0.5),
+                 toX(CX + wallW*0.5) - toX(CX - wallW*0.5),
+                 toZ(CZ_C + wallD*0.5) - toZ(CZ_C - wallD*0.5));
+
+  // Great hall
+  ctx.fillStyle = '#5a4a38';
+  ctx.fillRect(toX(keepX - hallW*0.5), toZ(keepZ + keepD*0.5),
+               toX(keepX + hallW*0.5) - toX(keepX - hallW*0.5),
+               toZ(keepZ + keepD*0.5 + hallD) - toZ(keepZ + keepD*0.5));
+
+  // Keep
+  ctx.fillStyle = '#3e3028';
+  ctx.fillRect(toX(keepX - keepW*0.5), toZ(keepZ - keepD*0.5),
+               toX(keepX + keepW*0.5) - toX(keepX - keepW*0.5),
+               toZ(keepZ + keepD*0.5) - toZ(keepZ - keepD*0.5));
+
+  // Pond
+  ctx.fillStyle = '#1e5a82';
+  ctx.beginPath();
+  ctx.arc(toX(0), toZ(0), 22 / WORLD * S, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Player direction line
+  const px  = toX(camera.position.x);
+  const pz  = toZ(camera.position.z);
+  const yaw = camera.rotation.y;
+  ctx.strokeStyle = '#aaddff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(px, pz);
+  ctx.lineTo(px - Math.sin(yaw) * 9, pz - Math.cos(yaw) * 9);
+  ctx.stroke();
+
+  // Player dot
+  ctx.fillStyle = '#4488ff';
+  ctx.beginPath();
+  ctx.arc(px, pz, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(px, pz, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // North label and border
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = 'bold 9px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('N', S * 0.5, 10);
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, S - 1, S - 1);
+}
+
 function animate() {
   requestAnimationFrame(animate);
 
@@ -1101,6 +1189,7 @@ function animate() {
   sporeAttr.needsUpdate = true;
 
   renderer.render(scene, camera);
+  if (mapVisible) drawMap();
 }
 
 animate();
