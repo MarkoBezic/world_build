@@ -1222,16 +1222,27 @@ function createOpenTextBuilding() {
   // Roof-level "OPEN TEXT" sign — mounted on north face of parapet, centred on curved section
   // Parapet front (north) face sits at z = frontZ - (CT + 1) * 0.5
   const parapetFaceZ = frontZ - (CT + 1) * 0.5;
-  const signW  = arcHalfW * 2 - 6;        // 34 units wide, spans curved section
-  const signH  = 3.2;
-  const signCY = BY + BH + RP * 0.5;      // vertically centred on parapet (BY + 38)
-  box(BX, signCY, parapetFaceZ - 0.3, signW, signH, 0.3, signDarkMat);       // dark backing
-  box(BX, signCY, parapetFaceZ - 0.48, signW - 3, signH - 1.0, 0.15, signLightMat); // light inner panel
+  const signW  = arcHalfW * 2 - 2;        // 38 units wide — spans full curved section
+  const signH  = RP - 0.4;                // fills most of parapet height
+  const signCY = BY + BH + RP * 0.5;      // vertically centred on parapet
+  // North parapet "OPEN TEXT" — full-height dark panel + light inset
+  box(BX, signCY, parapetFaceZ - 0.3,  signW,     signH,       0.3,  signDarkMat);
+  box(BX, signCY, parapetFaceZ - 0.52, signW - 3, signH - 0.6, 0.18, signLightMat);
 
-  // East-face corner sign (visible from east view per reference)
+  // East-face parapet sign — positioned toward south half of east wall
   const eastFaceX = BX + BW * 0.5 + (CT + 1) * 0.5;
-  box(eastFaceX + 0.3, signCY, BZ - BD * 0.15, 0.3, signH, 18, signDarkMat);
-  box(eastFaceX + 0.48, signCY, BZ - BD * 0.15, 0.15, signH - 1.0, 15, signLightMat);
+  const signSideZ = BZ + BD * 0.2;        // south half of face
+  box(eastFaceX + 0.3,  signCY, signSideZ, 0.3,  signH,       18, signDarkMat);
+  box(eastFaceX + 0.52, signCY, signSideZ, 0.18, signH - 0.6, 15, signLightMat);
+
+  // West-face parapet sign — mirror of east
+  const westFaceX = BX - BW * 0.5 - (CT + 1) * 0.5;
+  box(westFaceX - 0.3,  signCY, signSideZ, 0.3,  signH,       18, signDarkMat);
+  box(westFaceX - 0.52, signCY, signSideZ, 0.18, signH - 0.6, 15, signLightMat);
+
+  // South-face lobby sign panel
+  box(BX, BY + FL * 0.55, backZ + 0.3, 18, 2.0, 0.3, signDarkMat);
+  box(BX, BY + FL * 0.55, backZ + 0.52, 16, 1.3, 0.18, signLightMat);
 
   // Lobby-level "OPEN TEXT" sign — flush to arc facade between ground floor and canopy
   const lobbySignY = BY + FL * 0.58;
