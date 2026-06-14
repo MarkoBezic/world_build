@@ -764,6 +764,38 @@ function isColliding(px, pz) {
   return false;
 }
 
+// Eject player from any wall they're currently inside before movement runs.
+// Without this, being inside a volume lets resolveMove freely exit through the far side.
+function pushOut(px, pz) {
+  if (!isColliding(px, pz)) return [px, pz];
+  for (const b of collBoxes) {
+    const cx = Math.max(b[0], Math.min(b[1], px));
+    const cz = Math.max(b[2], Math.min(b[3], pz));
+    const d2 = (px - cx) * (px - cx) + (pz - cz) * (pz - cz);
+    if (d2 >= PLAYER_R * PLAYER_R) continue;
+    if (d2 < 0.0001) {
+      // Centre is inside the box — eject to nearest face
+      const toL = px - b[0], toR = b[1] - px, toN = pz - b[2], toS = b[3] - pz;
+      const m = Math.min(toL, toR, toN, toS);
+      if      (m === toL) return [b[0] - PLAYER_R, pz];
+      else if (m === toR) return [b[1] + PLAYER_R, pz];
+      else if (m === toN) return [px, b[2] - PLAYER_R];
+      else                return [px, b[3] + PLAYER_R];
+    }
+    const len = Math.sqrt(d2);
+    return [cx + (px - cx) / len * PLAYER_R, cz + (pz - cz) / len * PLAYER_R];
+  }
+  for (const c of collCyls) {
+    const dx = px - c[0], dz = pz - c[1];
+    const d2 = dx * dx + dz * dz, r = PLAYER_R + c[2];
+    if (d2 >= r * r) continue;
+    if (d2 < 0.0001) return [px + r, pz];
+    const len = Math.sqrt(d2);
+    return [c[0] + dx / len * r, c[1] + dz / len * r];
+  }
+  return [px, pz];
+}
+
 // Wall-slide: try full move, then X-only, then Z-only before giving up
 function resolveMove(ox, oz, dx, dz) {
   if (!isColliding(ox + dx, oz + dz)) return [ox + dx, oz + dz];
@@ -922,6 +954,10 @@ function animate() {
       const hasInput = fw !== 0 || rt !== 0;
       vel.x += (desX - vel.x) * Math.min(1, delta * (hasInput ? 9 : 14));
       vel.z += (desZ - vel.z) * Math.min(1, delta * (hasInput ? 9 : 14));
+
+      // Eject from any wall before resolving movement
+      const [epx, epz] = pushOut(camera.position.x, camera.position.z);
+      camera.position.x = epx; camera.position.z = epz;
 
       // Wall-slide collision resolution
       const ox = camera.position.x, oz = camera.position.z;
