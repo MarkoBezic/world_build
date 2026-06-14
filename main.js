@@ -814,6 +814,12 @@ const collBoxes = [
   [chX,         chX + 28,     chZ - 15.75, chZ - 12.25],   // north wall (half-collapsed)
   [chX - 1,     chX + 17,     chZ + 12.25, chZ + 15.75],   // south wall (low rubble)
   [chX + 20.25, chX + 23.75,  chZ - 8,     chZ + 8    ],   // east corner (partial)
+  // Moat — five strips matching the water geometry (bridge gap left open)
+  [moW, moE,  moN, miN],   // north
+  [miE, moE,  miN, miS],   // east
+  [moW, miW,  miN, miS],   // west
+  [moW, -bridgeHW, miS, moS],   // south-left of bridge
+  [bridgeHW,  moE, miS, moS],   // south-right of bridge
 ];
 // Cylinder obstacles [cx, cz, radius] — towers and keep turrets
 const collCyls = [
