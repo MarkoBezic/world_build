@@ -58,7 +58,7 @@ const keys      = {};
 
 if (!isMobile) {
   overlay.innerHTML = `
-    <h1>Forest World</h1>
+    <h1>The Ancient Realm</h1>
     <p>Click to explore</p>
     <div class="keys">
       <div class="key" style="grid-column:2">W</div>
@@ -74,7 +74,7 @@ if (!isMobile) {
   window.addEventListener('keyup',   e => { keys[e.code] = false; });
 } else {
   overlay.innerHTML = `
-    <h1>Forest World</h1>
+    <h1>The Ancient Realm</h1>
     <p>Tap to explore</p>
     <div class="mobile-hint"><span>Left — move</span><span>Right — look</span></div>`;
   overlay.addEventListener('click', () => { overlay.classList.add('hidden'); gameActive = true; });
