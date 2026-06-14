@@ -719,6 +719,47 @@ for (let i = 0; i < 40; i++) {
   scene.add(boulder);
 }
 
+// ─── Moat ─────────────────────────────────────────────────────────────────────
+const moatW   = 18;           // moat width in world units
+const moatGap = 3;            // gap between outer wall face and moat inner edge
+const moatY   = BY + 0.12;   // water surface sits just above castle ground level
+
+// Inner and outer moat edges
+const miN = CZ_C - wallD*0.5 - moatGap;       // inner north z  (≈ -450.5)
+const miS = CZ_C + wallD*0.5 + moatGap;       // inner south z  (≈ -289.5)
+const miE = CX   + wallW*0.5 + moatGap;       // inner east x   (≈  100.5)
+const miW = CX   - wallW*0.5 - moatGap;       // inner west x   (≈ -100.5)
+const moN = miN - moatW;   // outer north z   (≈ -468.5)
+const moS = miS + moatW;   // outer south z   (≈ -271.5)
+const moE = miE + moatW;   // outer east x    (≈  118.5)
+const moW = miW - moatW;   // outer west x    (≈ -118.5)
+const bridgeHW = gateW * 0.5;  // half-width of bridge gap (= 8)
+
+const moatMat = new THREE.MeshStandardMaterial({
+  color: 0x1a3d52, roughness: 0.06, metalness: 0.18,
+  transparent: true, opacity: 0.88,
+});
+
+function moatRect(minX, maxX, minZ, maxZ) {
+  const w = maxX - minX, d = maxZ - minZ;
+  const geo = new THREE.PlaneGeometry(w, d);
+  geo.rotateX(-Math.PI / 2);
+  const m = new THREE.Mesh(geo, moatMat);
+  m.position.set((minX + maxX) * 0.5, moatY, (minZ + maxZ) * 0.5);
+  m.receiveShadow = true;
+  scene.add(m);
+}
+
+// North strip (full width, covers NW/NE corners)
+moatRect(moW, moE, moN, miN);
+// East strip
+moatRect(miE, moE, miN, miS);
+// West strip
+moatRect(moW, miW, miN, miS);
+// South strip — split either side of bridge gap
+moatRect(moW,       -bridgeHW, miS, moS);
+moatRect(bridgeHW,  moE,       miS, moS);
+
 // ─── Collision volumes ────────────────────────────────────────────────────────
 // AABB obstacles [minX, maxX, minZ, maxZ] — outer curtain walls + keep walls
 const collBoxes = [
