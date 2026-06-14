@@ -840,12 +840,12 @@ const collBoxes = [
   // Keep — south wall (split for doorway)
   [keepX - keepW*0.5,          keepX - keepDoorW*0.5,      keepZ + keepD*0.5 - wt,        keepZ + keepD*0.5],
   [keepX + keepDoorW*0.5,      keepX + keepW*0.5,          keepZ + keepD*0.5 - wt,        keepZ + keepD*0.5],
-  // Great hall — south wall (split for 8-unit entrance gap so player can reach the keep doorway)
-  [keepX - hallW*0.5,          keepX - 4,                  keepZ + keepD*0.5 + hallD - 4, keepZ + keepD*0.5 + hallD],
-  [keepX + 4,                  keepX + hallW*0.5,           keepZ + keepD*0.5 + hallD - 4, keepZ + keepD*0.5 + hallD],
-  // Great hall — east / west walls (full depth)
-  [keepX + hallW*0.5 - 2,      keepX + hallW*0.5 + 2,      keepZ + keepD*0.5,             keepZ + keepD*0.5 + hallD],
-  [keepX - hallW*0.5 - 2,      keepX - hallW*0.5 + 2,      keepZ + keepD*0.5,             keepZ + keepD*0.5 + hallD],
+  // Great hall — south wall (split to match hallDoorW=10 visual opening)
+  [keepX - hallW*0.5,          keepX - hallDoorW*0.5,      keepZ + keepD*0.5 + hallD - wt, keepZ + keepD*0.5 + hallD],
+  [keepX + hallDoorW*0.5,      keepX + hallW*0.5,          keepZ + keepD*0.5 + hallD - wt, keepZ + keepD*0.5 + hallD],
+  // Great hall — east / west walls (wt thickness, matches visual geometry)
+  [keepX + hallW*0.5 - wt,     keepX + hallW*0.5,          keepZ + keepD*0.5,             keepZ + keepD*0.5 + hallD],
+  [keepX - hallW*0.5,          keepX - hallW*0.5 + wt,     keepZ + keepD*0.5,             keepZ + keepD*0.5 + hallD],
   // Ruined chapel — four surviving wall segments
   [chX - 1.75,  chX + 1.75,   chZ - 16,    chZ + 16   ],   // west wall (tallest survivor)
   [chX,         chX + 28,     chZ - 15.75, chZ - 12.25],   // north wall (half-collapsed)
