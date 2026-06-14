@@ -998,7 +998,7 @@ let bldBY = 0;   // set by createOpenTextBuilding(), read by getFloorH
 // Phase 1: Foundation pad, parking lot, concrete structural frame
 function createOpenTextBuilding() {
   const BX = 0, BZ = 200;  // building centre — south of spawn
-  const BW = 80, BD = 60;  // footprint: 80 wide (X) × 60 deep (Z)
+  const BW = 80, BD = 70;  // footprint: 80 wide (X) × 70 deep (Z)
   const BH = 36;            // body height: 6 floors × 6 units
   const FL = 6;             // floor-to-floor height
   const SH = 1.8;           // concrete spandrel band height
@@ -1007,7 +1007,7 @@ function createOpenTextBuilding() {
   // Sample highest terrain point under footprint so pad always rises above it
   let maxH = 0;
   for (let sx = -44; sx <= 44; sx += 8) {
-    for (let sz = -34; sz <= 34; sz += 8) {
+    for (let sz = -39; sz <= 39; sz += 8) {
       maxH = Math.max(maxH, getH(BX + sx, BZ + sz));
     }
   }
@@ -1016,8 +1016,9 @@ function createOpenTextBuilding() {
   const concMat    = new THREE.MeshStandardMaterial({ color: 0xe0dcd0, roughness: 0.86, metalness: 0.0 });
   const asphaltMat = new THREE.MeshStandardMaterial({ color: 0x1e1e20, roughness: 0.97, metalness: 0.0 });
   const glassMat   = new THREE.MeshStandardMaterial({
-    color: 0x1a3050, roughness: 0.05, metalness: 0.78, transparent: true, opacity: 0.70,
+    color: 0x0d1a28, roughness: 0.04, metalness: 0.90, transparent: true, opacity: 0.75,
   });
+  const mullMat    = new THREE.MeshStandardMaterial({ color: 0x6a6860, roughness: 0.6, metalness: 0.2 });
   const gh = FL - SH - 0.1;   // glazing panel height
 
   // Thick concrete foundation — buries into terrain so no gaps are visible
@@ -1040,13 +1041,13 @@ function createOpenTextBuilding() {
   box(BX, BY + 0.3, backZ + lotDS * 0.5, lotW, 0.6, lotDS, asphaltMat);
 
   // North parking stripes — 4 rows, lines run E-W, spaces 4.5 wide
-  [148, 154, 160, 166].forEach(sz => {
+  [143, 149, 155, 161].forEach(sz => {
     for (let sx = -51; sx <= 51; sx += 4.5) {
       box(BX + sx, BY + 0.65, sz, 0.25, 0.12, 4.8, stripeMat);
     }
   });
   // South parking stripes
-  [234, 240, 246, 252].forEach(sz => {
+  [239, 245, 251, 257].forEach(sz => {
     for (let sx = -51; sx <= 51; sx += 4.5) {
       box(BX + sx, BY + 0.65, sz, 0.25, 0.12, 4.8, stripeMat);
     }
@@ -1057,7 +1058,7 @@ function createOpenTextBuilding() {
 
   // Column X/Z positions — 7 across front/back, 5 across east/west
   const colXs = [-40, -26.7, -13.3, 0, 13.3, 26.7, 40].map(dx => BX + dx);
-  const colZs = [-30, -15, 0, 15, 30].map(dz => BZ + dz);
+  const colZs = [-35, -17.5, 0, 17.5, 35].map(dz => BZ + dz);
 
   // Vertical columns — all 7 on front and back, middle 3 on east/west (corners shared)
   colXs.forEach(cx => box(cx, BY + BH * 0.5, BZ - BD * 0.5, CT, BH, CT, concMat));
@@ -1087,18 +1088,23 @@ function createOpenTextBuilding() {
   for (let f = 0; f < 6; f++) {
     const gy = BY + f * FL + SH + gh * 0.5;
 
-    // Back face: 6 bays
+    // Back face: 6 bays + 2 vertical mullions per bay
     for (let b = 0; b < 6; b++) {
       const gx = (colXs[b] + colXs[b + 1]) * 0.5;
       const gw = (colXs[b + 1] - colXs[b]) - CT;
       box(gx, gy, BZ + BD * 0.5, gw, gh, 0.35, glassMat);
+      [-gw / 3, gw / 3].forEach(dx => box(gx + dx, gy, BZ + BD * 0.5, 0.25, gh, 0.5, mullMat));
     }
-    // East/west: 4 bays each
+    // East/west: 4 bays each + 2 vertical mullions per bay
     for (let b = 0; b < 4; b++) {
       const gz = (colZs[b] + colZs[b + 1]) * 0.5;
       const gd = (colZs[b + 1] - colZs[b]) - CT;
       box(BX + BW * 0.5, gy, gz, 0.35, gh, gd, glassMat);
       box(BX - BW * 0.5, gy, gz, 0.35, gh, gd, glassMat);
+      [-gd / 3, gd / 3].forEach(dz => {
+        box(BX + BW * 0.5, gy, gz + dz, 0.5, gh, 0.25, mullMat);
+        box(BX - BW * 0.5, gy, gz + dz, 0.5, gh, 0.25, mullMat);
+      });
     }
   }
 
@@ -1113,22 +1119,27 @@ function createOpenTextBuilding() {
   const segAngle  = 2 * halfAngle / nFacets;
   const chordW    = 2 * R_c * Math.sin(segAngle * 0.5);
 
-  // ── Flat left section: x from BX-40 to BX-arcHalfW(-20) ──
+  // ── Flat left section: x from BX-40 to BX-arcHalfW(-20), 3 mullions per floor ──
+  const flatW  = arcHalfW - CT;           // ≈ 17 u
+  const flatCX = BX - BW * 0.5 + arcHalfW * 0.5;  // centre = -30
   for (let f = 0; f < 6; f++) {
     const gy = BY + f * FL + SH + gh * 0.5;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(arcHalfW - CT, gh, 0.35), glassMat);
-    m.position.set(BX - BW * 0.5 + arcHalfW * 0.5, gy, frontZ);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(flatW, gh, 0.35), glassMat);
+    m.position.set(flatCX, gy, frontZ);
     m.castShadow = m.receiveShadow = true;
     scene.add(m);
+    [-flatW / 4, 0, flatW / 4].forEach(dx => box(flatCX + dx, gy, frontZ, 0.25, gh, 0.5, mullMat));
   }
 
   // ── Flat right section: x from BX+arcHalfW(+20) to BX+40 ──
+  const flatCXR = BX + BW * 0.5 - arcHalfW * 0.5;  // centre = +30
   for (let f = 0; f < 6; f++) {
     const gy = BY + f * FL + SH + gh * 0.5;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(arcHalfW - CT, gh, 0.35), glassMat);
-    m.position.set(BX + BW * 0.5 - arcHalfW * 0.5, gy, frontZ);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(flatW, gh, 0.35), glassMat);
+    m.position.set(flatCXR, gy, frontZ);
     m.castShadow = m.receiveShadow = true;
     scene.add(m);
+    [-flatW / 4, 0, flatW / 4].forEach(dx => box(flatCXR + dx, gy, frontZ, 0.25, gh, 0.5, mullMat));
   }
 
   // Transition columns at the flat-to-curved boundary (BX ± arcHalfW, z = frontZ)
@@ -1164,6 +1175,12 @@ function createOpenTextBuilding() {
       m.rotation.y = ry;
       m.castShadow = m.receiveShadow = true;
       scene.add(m);
+      // Centre mullion on each curved facet
+      const mu = new THREE.Mesh(new THREE.BoxGeometry(0.25, gh, 0.5), mullMat);
+      mu.position.set(fx, gy, fz);
+      mu.rotation.y = ry;
+      mu.castShadow = mu.receiveShadow = true;
+      scene.add(mu);
     }
   }
 
@@ -1279,7 +1296,7 @@ function getFloorH(px, pz) {
   if (px >  keepX + keepDoorW*0.5     && px <= keepX + keepW*0.5 + 0.3 &&
       pz >= keepZ + keepD*0.5 - wt - 0.3 && pz <= keepZ + keepD*0.5 + 0.3) return kTop; // south-right
   // OpenText building — flat surface covering building footprint + both parking lots
-  if (bldBY > 0 && Math.abs(px) < 58 && pz > 112 && pz < 284) return bldBY + 0.65;
+  if (bldBY > 0 && Math.abs(px) < 58 && pz > 108 && pz < 292) return bldBY + 0.65;
   return getH(px, pz);
 }
 
