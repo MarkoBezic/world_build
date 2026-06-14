@@ -738,6 +738,12 @@ const collBoxes = [
   // Keep — south wall (split for doorway)
   [keepX - keepW*0.5,          keepX - keepDoorW*0.5,      keepZ + keepD*0.5 - wt,        keepZ + keepD*0.5],
   [keepX + keepDoorW*0.5,      keepX + keepW*0.5,          keepZ + keepD*0.5 - wt,        keepZ + keepD*0.5],
+  // Great hall — south wall (split for 8-unit entrance gap so player can reach the keep doorway)
+  [keepX - hallW*0.5,          keepX - 4,                  keepZ + keepD*0.5 + hallD - 4, keepZ + keepD*0.5 + hallD],
+  [keepX + 4,                  keepX + hallW*0.5,           keepZ + keepD*0.5 + hallD - 4, keepZ + keepD*0.5 + hallD],
+  // Great hall — east / west walls (full depth)
+  [keepX + hallW*0.5 - 2,      keepX + hallW*0.5 + 2,      keepZ + keepD*0.5,             keepZ + keepD*0.5 + hallD],
+  [keepX - hallW*0.5 - 2,      keepX - hallW*0.5 + 2,      keepZ + keepD*0.5,             keepZ + keepD*0.5 + hallD],
 ];
 // Cylinder obstacles [cx, cz, radius] — towers and keep turrets
 const collCyls = [
