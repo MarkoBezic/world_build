@@ -597,9 +597,36 @@ for (let s = 0; s < stairCount; s++) {
       darkStoneMat);
 }
 
-// Inner great hall (attached to keep south face)
+// Inner great hall — hollow walls with a visible south entrance
 const hallW = 40, hallD = 28, hallH = 20;
-box(keepX, BY + hallH*0.5, keepZ + keepD*0.5 + hallD*0.5, hallW, hallH, hallD, stoneMat);
+const hallDoorW = 10, hallDoorH = 12;
+const hallSegW  = (hallW - hallDoorW) * 0.5;   // width of each south wall segment = 15
+
+// South wall — two segments flanking the door opening
+box(keepX - hallDoorW*0.5 - hallSegW*0.5, BY + hallH*0.5,
+    keepZ + keepD*0.5 + hallD - wt*0.5,
+    hallSegW, hallH, wt, stoneMat);
+box(keepX + hallDoorW*0.5 + hallSegW*0.5, BY + hallH*0.5,
+    keepZ + keepD*0.5 + hallD - wt*0.5,
+    hallSegW, hallH, wt, stoneMat);
+// Arch header above the door opening
+box(keepX, BY + hallDoorH + (hallH - hallDoorH)*0.5,
+    keepZ + keepD*0.5 + hallD - wt*0.5,
+    hallDoorW, hallH - hallDoorH, wt, stoneMat);
+
+// East and west walls (full depth)
+box(keepX + hallW*0.5 - wt*0.5, BY + hallH*0.5,
+    keepZ + keepD*0.5 + hallD*0.5,
+    wt, hallH, hallD, stoneMat);
+box(keepX - hallW*0.5 + wt*0.5, BY + hallH*0.5,
+    keepZ + keepD*0.5 + hallD*0.5,
+    wt, hallH, hallD, stoneMat);
+
+// Interior stone floor slab
+box(keepX, BY + 0.2, keepZ + keepD*0.5 + hallD*0.5,
+    hallW - wt*2, 0.4, hallD - wt*2, darkStoneMat);
+
+// Battlements on south, east, west wall tops
 battlements(keepX, BY + hallH, keepZ + keepD*0.5 + hallD, hallW, wallT, 'x', darkStoneMat);
 battlements(keepX - hallW*0.5, BY + hallH, keepZ + keepD*0.5 + hallD*0.5, hallD, wallT, 'z', darkStoneMat);
 battlements(keepX + hallW*0.5, BY + hallH, keepZ + keepD*0.5 + hallD*0.5, hallD, wallT, 'z', darkStoneMat);
