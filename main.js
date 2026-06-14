@@ -760,6 +760,30 @@ moatRect(moW, miW, miN, miS);
 moatRect(moW,       -bridgeHW, miS, moS);
 moatRect(bridgeHW,  moE,       miS, moS);
 
+// ─── Drawbridge ───────────────────────────────────────────────────────────────
+const plankCount = 9;
+const plankW     = gateW - 1.5;              // slightly narrower than gate
+const plankD     = moatW / plankCount;       // depth of each plank
+const plankY     = BY + 0.36;               // just above water surface
+
+for (let i = 0; i < plankCount; i++) {
+  const pz = moS - (i + 0.5) * plankD;     // step from south edge northward
+  box(CX, plankY, pz, plankW, 0.4, plankD - 0.12, woodMat);
+}
+
+// Side railings — posts at each end, horizontal rail between
+const railX = [CX - plankW * 0.5, CX + plankW * 0.5];
+railX.forEach(rx => {
+  // Post at south end
+  box(rx, plankY + 1.1, moS - 0.4,            0.35, 2.2, 0.35, woodMat);
+  // Post at north end (castle side)
+  box(rx, plankY + 1.1, miS + 0.4,            0.35, 2.2, 0.35, woodMat);
+  // Horizontal top rail spanning the moat
+  box(rx, plankY + 2.1, (miS + moS) * 0.5,   0.25, 0.2, moatW, woodMat);
+  // Mid rail
+  box(rx, plankY + 1.15, (miS + moS) * 0.5,  0.2,  0.15, moatW, woodMat);
+});
+
 // ─── Collision volumes ────────────────────────────────────────────────────────
 // AABB obstacles [minX, maxX, minZ, maxZ] — outer curtain walls + keep walls
 const collBoxes = [
