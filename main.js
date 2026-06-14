@@ -1249,17 +1249,27 @@ function createOpenTextBuilding() {
   box(BX, lobbySignY, apexZ - 0.3, 22, 2.2, 0.3, signDarkMat);
   box(BX, lobbySignY, apexZ - 0.48, 20, 1.4, 0.15, signLightMat);
 
-  // Phase 5 — Collision boxes + expose base height for getFloorH
+  // Phase 4 — Surroundings: grass strip + south entrance pillars
+  const grassMat = new THREE.MeshStandardMaterial({ color: 0x3a6b22, roughness: 0.92, metalness: 0.0 });
+  // Narrow grass strips between asphalt and building walls
+  box(BX,                  BY + 0.55, frontZ - 1.5,  BW + 4, 0.5, 3, grassMat);  // north
+  box(BX,                  BY + 0.55, backZ  + 1.5,  BW + 4, 0.5, 3, grassMat);  // south
+  box(BX + BW*0.5 + 1.5,  BY + 0.55, BZ,             3, 0.5, BD + 4, grassMat);  // east
+  box(BX - BW*0.5 - 1.5,  BY + 0.55, BZ,             3, 0.5, BD + 4, grassMat);  // west
+  // South entrance door pillars flanking central opening
+  [-1, 1].forEach(s => box(BX + s * 2.8, BY + FL * 0.42, backZ - CT * 0.5 - 0.4, 0.9, FL * 0.85, 0.9, concMat));
+
+  // Collision boxes + expose base height for getFloorH
   bldBY = BY;
 
-  const fz = frontZ;              // 170  — flat face Z
-  const az = fz - protrusion;     // 162  — arc apex Z (entrance face)
+  const fz = frontZ;              // north flat face Z
+  const az = fz - protrusion;     // arc apex Z (entrance face)
   const T  = CT + 0.5;            // collision half-thickness
 
   collBoxes.push(
-    // South (back) wall
+    // South (back) wall — BD=70
     [BX - BW*0.5 - 1, BX + BW*0.5 + 1, BZ + BD*0.5 - T, BZ + BD*0.5 + T],
-    // East wall
+    // East wall — from arc apex to south wall
     [BX + BW*0.5 - T, BX + BW*0.5 + T, az,               BZ + BD*0.5 + 1],
     // West wall
     [BX - BW*0.5 - T, BX - BW*0.5 + T, az,               BZ + BD*0.5 + 1],
