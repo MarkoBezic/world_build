@@ -1055,136 +1055,50 @@ function createOpenTextBuilding() {
   // Raised concrete curb / sidewalk at building base
   box(BX, BY + 0.8, frontZ - 2.5, BW + 6, 1.2, 4, concMat);
 
-  // Column X/Z positions — inner columns only; corner columns replaced by arc geometry
+  // Column X/Z positions — 7 across front/back, 5 across east/west
   const colXs = [-40, -26.7, -13.3, 0, 13.3, 26.7, 40].map(dx => BX + dx);
   const colZs = [-30, -15, 0, 15, 30].map(dz => BZ + dz);
-  const R_k   = 8;   // corner arc radius
-  const nKf   = 3;   // facets per corner (3 × 30° = 90°)
 
-  // Front/back inner columns (skip corner positions ±40)
-  colXs.slice(1, -1).forEach(cx => box(cx, BY + BH * 0.5, BZ - BD * 0.5, CT, BH, CT, concMat));
-  colXs.slice(1, -1).forEach(cx => box(cx, BY + BH * 0.5, BZ + BD * 0.5, CT, BH, CT, concMat));
-  // East/west inner columns (middle 3, corners excluded)
+  // Vertical columns — all 7 on front and back, middle 3 on east/west (corners shared)
+  colXs.forEach(cx => box(cx, BY + BH * 0.5, BZ - BD * 0.5, CT, BH, CT, concMat));
+  colXs.forEach(cx => box(cx, BY + BH * 0.5, BZ + BD * 0.5, CT, BH, CT, concMat));
   colZs.slice(1, -1).forEach(cz => box(BX - BW * 0.5, BY + BH * 0.5, cz, CT, BH, CT, concMat));
   colZs.slice(1, -1).forEach(cz => box(BX + BW * 0.5, BY + BH * 0.5, cz, CT, BH, CT, concMat));
 
-  // Horizontal spandrel bands — shortened by R_k on each end to leave room for corners
-  const spanW = BW - 2 * R_k;   // 64 for front/back
-  const spanD = BD - 2 * R_k;   // 44 for east/west
+  // Horizontal spandrel bands — full width on all 4 faces
   for (let f = 0; f <= 6; f++) {
     const sy = BY + f * FL + SH * 0.5;
-    box(BX, sy, BZ - BD * 0.5, spanW, SH, CT, concMat);  // front
-    box(BX, sy, BZ + BD * 0.5, spanW, SH, CT, concMat);  // back
-    box(BX - BW * 0.5, sy, BZ, CT, SH, spanD, concMat);  // west
-    box(BX + BW * 0.5, sy, BZ, CT, SH, spanD, concMat);  // east
+    box(BX,            sy, BZ - BD * 0.5, BW, SH, CT, concMat);
+    box(BX,            sy, BZ + BD * 0.5, BW, SH, CT, concMat);
+    box(BX - BW * 0.5, sy, BZ,            CT, SH, BD, concMat);
+    box(BX + BW * 0.5, sy, BZ,            CT, SH, BD, concMat);
   }
-
-  // ── Curved corner arcs (all 4 corners, 3 facets each) ──────────────────────
-  // Arc center is inset R_k from each sharp corner; sweep 90° = π/2
-  // Standard angle θ in xz-plane: position = center + (R_k·cos θ, R_k·sin θ)
-  // rotation.y = π/2 − θ   so local +z faces outward
-  const chordK   = 2 * R_k * Math.sin(Math.PI / (2 * nKf));  // chord per facet ≈ 4.14
-  const segK     = (Math.PI / 2) / nKf;                       // 30°
-
-  const corners = [
-    // [arc_cx, arc_cz, theta_start, label]
-    [BX - BW*0.5 + R_k, BZ - BD*0.5 + R_k, Math.PI,          'NW'],
-    [BX + BW*0.5 - R_k, BZ - BD*0.5 + R_k, Math.PI*1.5,      'NE'],
-    [BX + BW*0.5 - R_k, BZ + BD*0.5 - R_k, 0,                 'SE'],
-    [BX - BW*0.5 + R_k, BZ + BD*0.5 - R_k, Math.PI*0.5,      'SW'],
-  ];
-
-  corners.forEach(([cx, cz, th0]) => {
-    for (let i = 0; i < nKf; i++) {
-      const th  = th0 + (i + 0.5) * segK;
-      const px  = cx + R_k * Math.cos(th);
-      const pz  = cz + R_k * Math.sin(th);
-      const ry  = Math.PI * 0.5 - th;
-
-      // Corner spandrel bands
-      for (let f = 0; f <= 6; f++) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(chordK + 0.15, SH, CT), concMat);
-        m.position.set(px, BY + f * FL + SH * 0.5, pz);
-        m.rotation.y = ry;
-        m.castShadow = m.receiveShadow = true;
-        scene.add(m);
-      }
-      // Corner glass panels (all floors)
-      for (let f = 0; f < 6; f++) {
-        const gy = BY + f * FL + SH + gh * 0.5;
-        const m = new THREE.Mesh(new THREE.BoxGeometry(chordK - 0.1, gh, 0.35), glassMat);
-        m.position.set(px, gy, pz);
-        m.rotation.y = ry;
-        m.castShadow = m.receiveShadow = true;
-        scene.add(m);
-      }
-    }
-    // Corner arc columns at each facet boundary (nKf+1 = 4 boundary cols per corner)
-    for (let i = 0; i <= nKf; i++) {
-      const th = th0 + i * segK;
-      const px = cx + R_k * Math.cos(th);
-      const pz = cz + R_k * Math.sin(th);
-      const ry = Math.PI * 0.5 - th;
-      const m  = new THREE.Mesh(new THREE.BoxGeometry(CT, BH, CT), concMat);
-      m.position.set(px, BY + BH * 0.5, pz);
-      m.rotation.y = ry;
-      m.castShadow = m.receiveShadow = true;
-      scene.add(m);
-    }
-  });
-
-  // Corner parapet sections (match corner glass height above BH)
-  const RP_loc = 4;
-  corners.forEach(([cx, cz, th0]) => {
-    for (let i = 0; i < nKf; i++) {
-      const th = th0 + (i + 0.5) * segK;
-      const px = cx + R_k * Math.cos(th);
-      const pz = cz + R_k * Math.sin(th);
-      const ry = Math.PI * 0.5 - th;
-      const m  = new THREE.Mesh(new THREE.BoxGeometry(chordK + 0.15, RP_loc, CT + 1), concMat);
-      m.position.set(px, BY + BH + RP_loc * 0.5, pz);
-      m.rotation.y = ry;
-      m.castShadow = m.receiveShadow = true;
-      scene.add(m);
-    }
-  });
 
   // Roof parapet ring (4-unit tall raised band above BH)
   const RP = 4;
-  box(BX,            BY + BH + RP * 0.5, BZ - BD * 0.5, spanW, RP, CT + 1, concMat);
-  box(BX,            BY + BH + RP * 0.5, BZ + BD * 0.5, spanW, RP, CT + 1, concMat);
-  box(BX - BW * 0.5, BY + BH + RP * 0.5, BZ, CT + 1, RP, spanD, concMat);
-  box(BX + BW * 0.5, BY + BH + RP * 0.5, BZ, CT + 1, RP, spanD, concMat);
+  box(BX,            BY + BH + RP * 0.5, BZ - BD * 0.5, BW + 2, RP, CT + 1, concMat);
+  box(BX,            BY + BH + RP * 0.5, BZ + BD * 0.5, BW + 2, RP, CT + 1, concMat);
+  box(BX - BW * 0.5, BY + BH + RP * 0.5, BZ,            CT + 1, RP, BD + 2, concMat);
+  box(BX + BW * 0.5, BY + BH + RP * 0.5, BZ,            CT + 1, RP, BD + 2, concMat);
   // Flat roof slab
   box(BX, BY + BH - 0.3, BZ, BW - CT * 2, 0.6, BD - CT * 2, concMat);
 
-  // Phase 2 — Dark glass curtain wall: back, east, west faces
-  // Front (entrance) face is handled separately in Phase 3 (curved facade)
-  // Corner arc ends at x = BX ± (BW/2 - R_k) on front/back faces
-  // and at z = BZ ± (BD/2 - R_k) on east/west faces
-  const cornerX = BW * 0.5 - R_k;   // = 32
-  const cornerZ = BD * 0.5 - R_k;   // = 22
-
+  // Dark glass curtain wall — back, east, west faces (front handled by Phase 3 arc)
   for (let f = 0; f < 6; f++) {
     const gy = BY + f * FL + SH + gh * 0.5;
 
-    // Back face panels — clamp outer bays to corner boundary
+    // Back face: 6 bays
     for (let b = 0; b < 6; b++) {
-      const x0 = Math.max(colXs[b],     BX - cornerX);
-      const x1 = Math.min(colXs[b + 1], BX + cornerX);
-      if (x1 - x0 < 0.5) continue;
-      const gw = x1 - x0 - CT * 0.5;
-      box((x0 + x1) * 0.5, gy, BZ + BD * 0.5, gw, gh, 0.35, glassMat);
+      const gx = (colXs[b] + colXs[b + 1]) * 0.5;
+      const gw = (colXs[b + 1] - colXs[b]) - CT;
+      box(gx, gy, BZ + BD * 0.5, gw, gh, 0.35, glassMat);
     }
-
-    // East/west face panels — clamp outer bays to corner boundary
+    // East/west: 4 bays each
     for (let b = 0; b < 4; b++) {
-      const z0 = Math.max(colZs[b],     BZ - cornerZ);
-      const z1 = Math.min(colZs[b + 1], BZ + cornerZ);
-      if (z1 - z0 < 0.5) continue;
-      const gd = z1 - z0 - CT * 0.5;
-      box(BX + BW * 0.5, gy, (z0 + z1) * 0.5, 0.35, gh, gd, glassMat);
-      box(BX - BW * 0.5, gy, (z0 + z1) * 0.5, 0.35, gh, gd, glassMat);
+      const gz = (colZs[b] + colZs[b + 1]) * 0.5;
+      const gd = (colZs[b + 1] - colZs[b]) - CT;
+      box(BX + BW * 0.5, gy, gz, 0.35, gh, gd, glassMat);
+      box(BX - BW * 0.5, gy, gz, 0.35, gh, gd, glassMat);
     }
   }
 
@@ -1199,21 +1113,20 @@ function createOpenTextBuilding() {
   const segAngle  = 2 * halfAngle / nFacets;
   const chordW    = 2 * R_c * Math.sin(segAngle * 0.5);
 
-  // ── Flat left section: x from BX-cornerX(-32) to BX-arcHalfW(-20) ──
-  const flatW = cornerX - arcHalfW;   // = 32 - 20 = 12
+  // ── Flat left section: x from BX-40 to BX-arcHalfW(-20) ──
   for (let f = 0; f < 6; f++) {
     const gy = BY + f * FL + SH + gh * 0.5;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(flatW - CT, gh, 0.35), glassMat);
-    m.position.set(BX - arcHalfW - flatW * 0.5, gy, frontZ);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(arcHalfW - CT, gh, 0.35), glassMat);
+    m.position.set(BX - BW * 0.5 + arcHalfW * 0.5, gy, frontZ);
     m.castShadow = m.receiveShadow = true;
     scene.add(m);
   }
 
-  // ── Flat right section: x from BX+arcHalfW(+20) to BX+cornerX(+32) ──
+  // ── Flat right section: x from BX+arcHalfW(+20) to BX+40 ──
   for (let f = 0; f < 6; f++) {
     const gy = BY + f * FL + SH + gh * 0.5;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(flatW - CT, gh, 0.35), glassMat);
-    m.position.set(BX + arcHalfW + flatW * 0.5, gy, frontZ);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(arcHalfW - CT, gh, 0.35), glassMat);
+    m.position.set(BX + BW * 0.5 - arcHalfW * 0.5, gy, frontZ);
     m.castShadow = m.receiveShadow = true;
     scene.add(m);
   }
@@ -1309,18 +1222,17 @@ function createOpenTextBuilding() {
   const az = fz - protrusion;     // 162  — arc apex Z (entrance face)
   const T  = CT + 0.5;            // collision half-thickness
 
-  const nWallZ0 = BZ - BD*0.5 + R_k;   // north wall starts after NW/NE corners
   collBoxes.push(
-    // South (back) wall — shortened for corner arcs
-    [BX - cornerX - 1, BX + cornerX + 1, BZ + BD*0.5 - T, BZ + BD*0.5 + T],
-    // East wall — from north corner to south corner
-    [BX + BW*0.5 - T, BX + BW*0.5 + T, nWallZ0, BZ + BD*0.5 - R_k + 1],
+    // South (back) wall
+    [BX - BW*0.5 - 1, BX + BW*0.5 + 1, BZ + BD*0.5 - T, BZ + BD*0.5 + T],
+    // East wall
+    [BX + BW*0.5 - T, BX + BW*0.5 + T, az,               BZ + BD*0.5 + 1],
     // West wall
-    [BX - BW*0.5 - T, BX - BW*0.5 + T, nWallZ0, BZ + BD*0.5 - R_k + 1],
-    // North face left flat section (west of entrance arc, east of NW corner)
-    [BX - cornerX - 1, BX - 10,          az - 1, fz + T],
+    [BX - BW*0.5 - T, BX - BW*0.5 + T, az,               BZ + BD*0.5 + 1],
+    // North face left flat section — open centre entrance
+    [BX - BW*0.5 - 1, BX - 10,          az - 1,           fz + T],
     // North face right flat section
-    [BX + 10,          BX + cornerX + 1, az - 1, fz + T]
+    [BX + 10,         BX + BW*0.5 + 1,  az - 1,           fz + T]
   );
 }
 createOpenTextBuilding();
