@@ -719,6 +719,59 @@ for (let i = 0; i < 40; i++) {
   scene.add(boulder);
 }
 
+// ─── Collision volumes ────────────────────────────────────────────────────────
+// AABB obstacles [minX, maxX, minZ, maxZ] — outer curtain walls + keep walls
+const collBoxes = [
+  // Outer curtain — north wall
+  [CX - wallW*0.5,             CX + wallW*0.5,             CZ_C - wallD*0.5 - wallT*0.5, CZ_C - wallD*0.5 + wallT*0.5],
+  // Outer curtain — south wall (split for gate opening)
+  [CX - wallW*0.5,             CX - gateW*0.5,             CZ_C + wallD*0.5 - wallT*0.5, CZ_C + wallD*0.5 + wallT*0.5],
+  [CX + gateW*0.5,             CX + wallW*0.5,             CZ_C + wallD*0.5 - wallT*0.5, CZ_C + wallD*0.5 + wallT*0.5],
+  // Outer curtain — east / west walls
+  [CX + wallW*0.5 - wallT*0.5, CX + wallW*0.5 + wallT*0.5, CZ_C - wallD*0.5,            CZ_C + wallD*0.5],
+  [CX - wallW*0.5 - wallT*0.5, CX - wallW*0.5 + wallT*0.5, CZ_C - wallD*0.5,            CZ_C + wallD*0.5],
+  // Keep — north wall
+  [keepX - keepW*0.5,          keepX + keepW*0.5,          keepZ - keepD*0.5,             keepZ - keepD*0.5 + wt],
+  // Keep — east / west walls
+  [keepX + keepW*0.5 - wt,     keepX + keepW*0.5,          keepZ - keepD*0.5,             keepZ + keepD*0.5],
+  [keepX - keepW*0.5,          keepX - keepW*0.5 + wt,     keepZ - keepD*0.5,             keepZ + keepD*0.5],
+  // Keep — south wall (split for doorway)
+  [keepX - keepW*0.5,          keepX - keepDoorW*0.5,      keepZ + keepD*0.5 - wt,        keepZ + keepD*0.5],
+  [keepX + keepDoorW*0.5,      keepX + keepW*0.5,          keepZ + keepD*0.5 - wt,        keepZ + keepD*0.5],
+];
+// Cylinder obstacles [cx, cz, radius] — towers and keep turrets
+const collCyls = [
+  // Outer corner towers
+  [CX - wallW*0.5, CZ_C - wallD*0.5, tR], [CX + wallW*0.5, CZ_C - wallD*0.5, tR],
+  [CX - wallW*0.5, CZ_C + wallD*0.5, tR], [CX + wallW*0.5, CZ_C + wallD*0.5, tR],
+  // Gatehouse flanking towers
+  [CX - (gateW*0.5 + 5), CZ_C + wallD*0.5, 6], [CX + (gateW*0.5 + 5), CZ_C + wallD*0.5, 6],
+  // Keep corner turrets
+  [keepX - keepW*0.5, keepZ - keepD*0.5, ktR], [keepX + keepW*0.5, keepZ - keepD*0.5, ktR],
+  [keepX - keepW*0.5, keepZ + keepD*0.5, ktR], [keepX + keepW*0.5, keepZ + keepD*0.5, ktR],
+];
+
+function isColliding(px, pz) {
+  for (const b of collBoxes) {
+    const cx = Math.max(b[0], Math.min(b[1], px));
+    const cz = Math.max(b[2], Math.min(b[3], pz));
+    if ((px - cx)*(px - cx) + (pz - cz)*(pz - cz) < PLAYER_R * PLAYER_R) return true;
+  }
+  for (const c of collCyls) {
+    const dx = px - c[0], dz = pz - c[1], r = PLAYER_R + c[2];
+    if (dx*dx + dz*dz < r*r) return true;
+  }
+  return false;
+}
+
+// Wall-slide: try full move, then X-only, then Z-only before giving up
+function resolveMove(ox, oz, dx, dz) {
+  if (!isColliding(ox + dx, oz + dz)) return [ox + dx, oz + dz];
+  if (!isColliding(ox + dx, oz))      return [ox + dx, oz];
+  if (!isColliding(ox, oz + dz))      return [ox,      oz + dz];
+  return [ox, oz];
+}
+
 // ─── Particles ────────────────────────────────────────────────────────────────
 const DUST_N = 200, SPORE_N = 180;
 
@@ -787,6 +840,8 @@ let firstFrame = true;
 let elapsed    = 0;
 let bobPhase   = 0;
 let smoothY    = 2.5;
+const vel      = new THREE.Vector3();
+const PLAYER_R = 0.5;
 
 // Returns the walkable floor height at world position (px, pz).
 // Checks the staircase ramp first, then keep wall-walks, then terrain.
@@ -817,19 +872,21 @@ function moveAndFollow(delta, moving, speed) {
   p.x = Math.max(-WORLD*0.5 + 4, Math.min(WORLD*0.5 - 4, p.x));
   p.z = Math.max(-WORLD*0.5 + 4, Math.min(WORLD*0.5 - 4, p.z));
   const targetY = getFloorH(p.x, p.z) + 1.72;
-  // Climbing is instant; falling is capped so stepping off a wall feels physical
   const dy = targetY - smoothY;
   if (dy > 0) {
     smoothY += dy * Math.min(1, delta * 14);
   } else {
     smoothY = Math.max(targetY, smoothY - 10 * delta);
   }
-  if (moving) {
-    bobPhase += delta * speed * 1.1;
-    p.y = smoothY + Math.sin(bobPhase) * 0.055;
+  // Head-bob: amplitude scales with actual speed; second harmonic adds organic feel
+  if (moving && speed > 0.5) {
+    bobPhase += delta * speed * 0.9;
+    const amp = Math.min(0.065, 0.040 + speed * 0.0009);
+    p.y = smoothY + Math.sin(bobPhase) * amp + Math.sin(bobPhase * 0.48) * amp * 0.22;
   } else {
-    bobPhase = 0;
-    p.y = smoothY;
+    // Smooth decay rather than hard stop
+    bobPhase *= Math.max(0, 1 - delta * 8);
+    p.y = smoothY + Math.sin(bobPhase) * 0.008;
   }
 }
 
@@ -849,27 +906,48 @@ function animate() {
 
   if (gameActive) {
     if (!isMobile) {
-      const sprint  = keys['ShiftLeft'] || keys['ShiftRight'];
-      const speed   = sprint ? 24 : 10;
-      const moving  = keys['KeyW']||keys['ArrowUp']||keys['KeyS']||keys['ArrowDown']||
-                      keys['KeyA']||keys['ArrowLeft']||keys['KeyD']||keys['ArrowRight'];
-      if (keys['KeyW']||keys['ArrowUp'])    plControls.moveForward( speed * delta);
-      if (keys['KeyS']||keys['ArrowDown'])  plControls.moveForward(-speed * delta);
-      if (keys['KeyA']||keys['ArrowLeft'])  plControls.moveRight(  -speed * delta);
-      if (keys['KeyD']||keys['ArrowRight']) plControls.moveRight(   speed * delta);
-      moveAndFollow(delta, moving, speed);
+      const sprint = keys['ShiftLeft'] || keys['ShiftRight'];
+      const speed  = sprint ? 24 : 10;
+
+      // Flat camera forward/right (ignores pitch for movement)
+      _right.setFromMatrixColumn(camera.matrix, 0);
+      _fwd.crossVectors(camera.up, _right);
+
+      const fw = (keys['KeyW']||keys['ArrowUp']    ? 1 : 0) - (keys['KeyS']||keys['ArrowDown']  ? 1 : 0);
+      const rt = (keys['KeyD']||keys['ArrowRight'] ? 1 : 0) - (keys['KeyA']||keys['ArrowLeft']  ? 1 : 0);
+      const desX = (_fwd.x * fw + _right.x * rt) * speed;
+      const desZ = (_fwd.z * fw + _right.z * rt) * speed;
+
+      // Inertia: accelerate toward desired, decelerate faster when no input
+      const hasInput = fw !== 0 || rt !== 0;
+      vel.x += (desX - vel.x) * Math.min(1, delta * (hasInput ? 9 : 14));
+      vel.z += (desZ - vel.z) * Math.min(1, delta * (hasInput ? 9 : 14));
+
+      // Wall-slide collision resolution
+      const ox = camera.position.x, oz = camera.position.z;
+      const dx = vel.x * delta,     dz = vel.z * delta;
+      const [nx, nz] = resolveMove(ox, oz, dx, dz);
+      if (Math.abs(dx) > 0.0001 && nx === ox) vel.x = 0; // wall in X — kill that component
+      if (Math.abs(dz) > 0.0001 && nz === oz) vel.z = 0; // wall in Z — kill that component
+      camera.position.x = nx; camera.position.z = nz;
+
+      const spd    = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+      const moving = spd > 0.25;
+      moveAndFollow(delta, moving, spd);
     } else {
       camera.rotation.y = mYaw;
       camera.rotation.x = mPitch;
       const moving = joy.active && (joy.dx !== 0 || joy.dy !== 0);
       if (moving) {
-        const speed = 10;
+        const mspeed = 10;
         _right.setFromMatrixColumn(camera.matrix, 0);
         _fwd.crossVectors(camera.up, _right);
-        camera.position.addScaledVector(_fwd,   -(joy.dy/JMAX) * speed * delta);
-        camera.position.addScaledVector(_right,  (joy.dx/JMAX) * speed * delta);
+        const mdx = (-(joy.dy/JMAX) * _fwd.x + (joy.dx/JMAX) * _right.x) * mspeed * delta;
+        const mdz = (-(joy.dy/JMAX) * _fwd.z + (joy.dx/JMAX) * _right.z) * mspeed * delta;
+        const [mnx, mnz] = resolveMove(camera.position.x, camera.position.z, mdx, mdz);
+        camera.position.x = mnx; camera.position.z = mnz;
       }
-      moveAndFollow(delta, moving, 10);
+      moveAndFollow(delta, moving, moving ? 10 : 0);
     }
   }
 
