@@ -1111,7 +1111,7 @@ function createOpenTextBuilding() {
   // Phase 3 — Front facade: 25% flat | 50% curved | 25% flat
   // The curved arc covers only the centre 50% (arcHalfW = BW*0.25 on each side of BX)
   const arcHalfW  = BW * 0.25;   // = 20: curved zone spans BX ± 20
-  const protrusion = 8;           // gentle 8-unit forward bow
+  const protrusion = 11;          // 11-unit forward bow — more prominent
   const nFacets   = 8;
   const R_c       = (arcHalfW * arcHalfW + protrusion * protrusion) / (2 * protrusion); // = 29
   const arcCZ     = frontZ - protrusion + R_c;
@@ -1196,14 +1196,20 @@ function createOpenTextBuilding() {
     scene.add(m);
   }
 
-  // Entrance canopy — spans the 4 centre entrance facets
+  // Entrance canopy — wide slab spanning the 4 centre entrance facets + margin
   const apexZ   = frontZ - protrusion;       // front-most arc point
-  const canopyW = chordW * 4 + 2;            // ≈ 24 units wide
-  const canopyY = BY + FL + 0.5;
-  box(BX, canopyY, apexZ - 2, canopyW, 0.8, 10, concMat);
-  const pillarX = canopyW * 0.5 - 1.2;
-  box(BX - pillarX, BY + FL * 0.5, apexZ - 1.5, 0.8, FL, 0.8, concMat);
-  box(BX + pillarX, BY + FL * 0.5, apexZ - 1.5, 0.8, FL, 0.8, concMat);
+  const canopyW = chordW * 4 + 8;            // entrance width + generous margin
+  const canopyY = BY + FL + 0.8;
+  // Main canopy slab (1.2 thick, 13 deep)
+  box(BX, canopyY, apexZ - 3.5, canopyW, 1.2, 13, concMat);
+  // Underside shadow line (thin dark soffit)
+  const soffitMat = new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.9, metalness: 0.0 });
+  box(BX, canopyY - 0.65, apexZ - 3.5, canopyW - 0.4, 0.18, 12.6, soffitMat);
+  // 4 square pillars evenly distributed under canopy
+  const pSpan = canopyW * 0.32;
+  [-pSpan, -pSpan * 0.33, pSpan * 0.33, pSpan].forEach(dx => {
+    box(BX + dx, BY + FL * 0.5, apexZ - 2, 1.0, FL, 1.0, concMat);
+  });
 
   // Phase 4 — Roof cornice cap + sign boards
 
@@ -1227,10 +1233,10 @@ function createOpenTextBuilding() {
   box(eastFaceX + 0.3, signCY, BZ - BD * 0.15, 0.3, signH, 18, signDarkMat);
   box(eastFaceX + 0.48, signCY, BZ - BD * 0.15, 0.15, signH - 1.0, 15, signLightMat);
 
-  // Lobby-level sign — dark panel above entrance canopy at arc apex
-  const lobbySignY = canopyY + 2.2;       // above canopy top
+  // Lobby-level "OPEN TEXT" sign — flush to arc facade between ground floor and canopy
+  const lobbySignY = BY + FL * 0.58;
   box(BX, lobbySignY, apexZ - 0.3, 22, 2.2, 0.3, signDarkMat);
-  box(BX, lobbySignY, apexZ - 0.48, 20,  1.4, 0.15, signLightMat);
+  box(BX, lobbySignY, apexZ - 0.48, 20, 1.4, 0.15, signLightMat);
 
   // Phase 5 — Collision boxes + expose base height for getFloorH
   bldBY = BY;
